@@ -8,7 +8,7 @@ pub struct EmbeddedSchema {
     pub document: Value,
 }
 
-const CONTRACT_FILES: [(&str, &str); 25] = [
+const CONTRACT_FILES: [(&str, &str); 26] = [
     (
         "command-v1",
         include_str!("../../../contracts/v1/command-v1.json"),
@@ -109,9 +109,13 @@ const CONTRACT_FILES: [(&str, &str); 25] = [
         "promotion-gate-v1",
         include_str!("../../../contracts/v1/promotion-gate-v1.json"),
     ),
+    (
+        "release-approval-v1",
+        include_str!("../../../contracts/v1/release-approval-v1.json"),
+    ),
 ];
 
-const EVENT_FILES: [(&str, &str); 9] = [
+const EVENT_FILES: [(&str, &str); 12] = [
     (
         "event-envelope-v1",
         include_str!("../../../events/envelope/v1/event-envelope-v1.json"),
@@ -148,6 +152,18 @@ const EVENT_FILES: [(&str, &str); 9] = [
         "promotion-gate-evaluated-v1",
         include_str!("../../../events/capital_markets/v1/promotion-gate-evaluated-v1.json"),
     ),
+    (
+        "release-approval-requested-v1",
+        include_str!("../../../events/platform/v1/release-approval-requested-v1.json"),
+    ),
+    (
+        "release-approval-approved-v1",
+        include_str!("../../../events/platform/v1/release-approval-approved-v1.json"),
+    ),
+    (
+        "release-approval-denied-v1",
+        include_str!("../../../events/platform/v1/release-approval-denied-v1.json"),
+    ),
 ];
 
 const SURREALDB_FILES: [(&str, &str); 1] = [(
@@ -182,5 +198,27 @@ pub fn embedded_surrealdb_schemas() -> InstitutionalResult<Vec<EmbeddedSchema>> 
     SURREALDB_FILES
         .iter()
         .map(|(name, document)| parse(name, document))
+        .collect()
+}
+
+pub fn embedded_boundary_catalogs() -> InstitutionalResult<Vec<EmbeddedSchema>> {
+    let catalogs = [
+        (
+            "service-boundaries-v1",
+            contracts::service_boundary_catalog_document(),
+        ),
+        (
+            "workflow-boundaries-v1",
+            contracts::workflow_boundary_catalog_document(),
+        ),
+    ];
+
+    catalogs
+        .into_iter()
+        .map(|(name, document)| {
+            let serialized = serde_json::to_string(&document)
+                .map_err(|error| InstitutionalError::parse(name, error.to_string()))?;
+            parse(name, &serialized)
+        })
         .collect()
 }

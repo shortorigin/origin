@@ -40,22 +40,6 @@ fn builtin_app_id(raw: &'static str) -> ApplicationId {
     ApplicationId::trusted(raw)
 }
 
-fn compatibility_metadata(
-    display_name: &'static str,
-    requested_capabilities: &'static [AppCapability],
-    window_defaults: (i32, i32),
-) -> GeneratedAppManifestMetadata {
-    GeneratedAppManifestMetadata {
-        display_name,
-        requested_capabilities,
-        single_instance: true,
-        suspend_policy: SuspendPolicy::OnMinimize,
-        show_in_launcher: false,
-        show_on_desktop: false,
-        window_defaults,
-    }
-}
-
 /// Returns the generated manifest catalog payload used for build-time discovery validation.
 pub fn app_manifest_catalog_json() -> &'static str {
     APP_MANIFEST_CATALOG_JSON
@@ -126,51 +110,31 @@ fn build_app_registry() -> Vec<AppDescriptor> {
         build_app_descriptor(
             APP_ID_CALCULATOR,
             "Calculator",
-            compatibility_metadata(
-                "Calculator",
-                &[AppCapability::Window, AppCapability::State],
-                (420, 520),
-            ),
+            SYSTEM_CALCULATOR_MANIFEST,
             AppModule::new(placeholders::mount_calculator_placeholder_app),
         ),
         build_app_descriptor(
             APP_ID_EXPLORER,
             "Explorer",
-            compatibility_metadata(
-                "Explorer",
-                &[
-                    AppCapability::Window,
-                    AppCapability::State,
-                    AppCapability::Commands,
-                ],
-                (720, 540),
-            ),
+            SYSTEM_EXPLORER_MANIFEST,
             AppModule::new(placeholders::mount_explorer_placeholder_app),
         ),
         build_app_descriptor(
             APP_ID_NOTEPAD,
             "Notes",
-            compatibility_metadata(
-                "Notepad",
-                &[AppCapability::Window, AppCapability::State],
-                (640, 480),
-            ),
+            SYSTEM_NOTEPAD_MANIFEST,
             AppModule::new(placeholders::mount_notepad_placeholder_app),
         ),
         build_app_descriptor(
             APP_ID_UI_SHOWCASE,
             "UI Showcase",
-            compatibility_metadata(
-                "UI Showcase",
-                &[AppCapability::Window, AppCapability::Theme],
-                (900, 680),
-            ),
+            SYSTEM_UI_SHOWCASE_MANIFEST,
             AppModule::new(placeholders::mount_ui_showcase_placeholder_app),
         ),
         build_app_descriptor(
             APP_ID_DIALUP,
             "Dial-up",
-            compatibility_metadata("Dial-up", &[AppCapability::Window], (460, 320)),
+            SYSTEM_DIALUP_MANIFEST,
             AppModule::new(placeholders::mount_dialup_placeholder_app),
         ),
     ]
@@ -368,11 +332,46 @@ fn default_window_rect_for_app(
                 0.82,
                 0.82,
             ),
-            APP_ID_EXPLORER => (720, 540, 0.92, 0.92, 0.80, 0.78),
-            APP_ID_NOTEPAD => (640, 480, 0.88, 0.88, 0.74, 0.74),
-            APP_ID_CALCULATOR => (420, 520, 0.78, 0.86, 0.56, 0.74),
-            APP_ID_UI_SHOWCASE => (900, 680, 0.92, 0.92, 0.88, 0.88),
-            APP_ID_DIALUP => (460, 320, 0.66, 0.68, 0.48, 0.50),
+            APP_ID_EXPLORER => (
+                SYSTEM_EXPLORER_MANIFEST.window_defaults.0,
+                SYSTEM_EXPLORER_MANIFEST.window_defaults.1,
+                0.92,
+                0.92,
+                0.80,
+                0.78,
+            ),
+            APP_ID_NOTEPAD => (
+                SYSTEM_NOTEPAD_MANIFEST.window_defaults.0,
+                SYSTEM_NOTEPAD_MANIFEST.window_defaults.1,
+                0.88,
+                0.88,
+                0.74,
+                0.74,
+            ),
+            APP_ID_CALCULATOR => (
+                SYSTEM_CALCULATOR_MANIFEST.window_defaults.0,
+                SYSTEM_CALCULATOR_MANIFEST.window_defaults.1,
+                0.78,
+                0.86,
+                0.56,
+                0.74,
+            ),
+            APP_ID_UI_SHOWCASE => (
+                SYSTEM_UI_SHOWCASE_MANIFEST.window_defaults.0,
+                SYSTEM_UI_SHOWCASE_MANIFEST.window_defaults.1,
+                0.92,
+                0.92,
+                0.88,
+                0.88,
+            ),
+            APP_ID_DIALUP => (
+                SYSTEM_DIALUP_MANIFEST.window_defaults.0,
+                SYSTEM_DIALUP_MANIFEST.window_defaults.1,
+                0.66,
+                0.68,
+                0.48,
+                0.50,
+            ),
             _ => (
                 DEFAULT_WINDOW_WIDTH,
                 DEFAULT_WINDOW_HEIGHT,
@@ -391,6 +390,40 @@ fn default_window_rect_for_app(
     let y = vp.y + ((vp.h - h) / 2).max(10);
 
     crate::model::WindowRect { x, y, w, h }
+}
+
+fn mount_control_center_app(context: AppMountContext) -> View {
+    view! {
+        <ControlCenterApp
+            launch_params=context.launch_params.clone()
+            restored_state=Some(context.restored_state.clone())
+            services=Some(context.services)
+        />
+    }
+    .into_view()
+}
+
+fn mount_terminal_app(context: AppMountContext) -> View {
+    view! {
+        <TerminalApp
+            window_id=context.window_id
+            launch_params=context.launch_params.clone()
+            restored_state=Some(context.restored_state.clone())
+            services=Some(context.services)
+        />
+    }
+    .into_view()
+}
+
+fn mount_settings_app(context: AppMountContext) -> View {
+    view! {
+        <SettingsApp
+            launch_params=context.launch_params.clone()
+            restored_state=Some(context.restored_state.clone())
+            services=Some(context.services)
+        />
+    }
+    .into_view()
 }
 
 #[cfg(test)]
@@ -455,38 +488,4 @@ mod tests {
         assert!(control_center.w > terminal.w);
         assert!(control_center.h >= terminal.h);
     }
-}
-
-fn mount_control_center_app(context: AppMountContext) -> View {
-    view! {
-        <ControlCenterApp
-            launch_params=context.launch_params.clone()
-            restored_state=Some(context.restored_state.clone())
-            services=Some(context.services)
-        />
-    }
-    .into_view()
-}
-
-fn mount_terminal_app(context: AppMountContext) -> View {
-    view! {
-        <TerminalApp
-            window_id=context.window_id
-            launch_params=context.launch_params.clone()
-            restored_state=Some(context.restored_state.clone())
-            services=Some(context.services)
-        />
-    }
-    .into_view()
-}
-
-fn mount_settings_app(context: AppMountContext) -> View {
-    view! {
-        <SettingsApp
-            launch_params=context.launch_params.clone()
-            restored_state=Some(context.restored_state.clone())
-            services=Some(context.services)
-        />
-    }
-    .into_view()
 }

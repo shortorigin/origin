@@ -47,17 +47,14 @@ jobs:
           ref: ${{ inputs.target_sha }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "20"
-          cache: npm
           cache-dependency-path: infrastructure/pulumi/package-lock.json
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt, clippy
 
       - name: Setup ORAS
         uses: oras-project/setup-oras@v1
@@ -67,14 +64,11 @@ jobs:
 
       - name: Rebuild and verify target SHA
         run: |
-          cargo fmt --all --check
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
-          cargo test --workspace --all-targets
-          cargo components-build
-          cargo test -p wasmcloud-bindings -p wasmcloud-smoke-tests -p surrealdb-access
+          cargo xtask run verify-full
+          cargo xtask run components-build
 
       - name: Render component descriptors
-        run: cargo xtask delivery render-components --environment stage --tag "${RELEASE_TAG}" --output-dir target/delivery/components
+        run: cargo xtask artifacts delivery components --environment stage --tag "${RELEASE_TAG}" --output-dir target/delivery/components
 
       - name: Publish release-candidate descriptors
         id: publish
@@ -98,7 +92,7 @@ jobs:
 
       - name: Render stage manifest
         run: |
-          cargo xtask delivery render-manifest \
+          cargo xtask artifacts delivery manifest \
             --environment stage \
             --finance-ref "${{ steps.publish.outputs.finance_ref }}" \
             --finance-digest "${{ steps.publish.outputs.finance_digest }}" \

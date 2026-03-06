@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "control_testing"
+touched_domains = ["audit_assurance", "compliance"]
+target_services = ["audit-service", "compliance-service"]
+emits_evidence = true
+mutation_path_only = true

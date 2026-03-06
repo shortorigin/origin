@@ -37,49 +37,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+          cargo-bins: |
+            trunk
+            tauri-cli
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: ui/e2e/package-lock.json
 
-      - name: Install UI and desktop build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libxdo-dev
+      - name: Setup Linux UI packages
+        uses: ./.github/actions/setup-linux-ui
 
-      - name: Install Trunk
-        run: cargo install trunk --locked
+      - name: Doctor core toolchain
+        run: cargo xtask doctor --domain core --ci
 
-      - name: cargo fmt
-        run: cargo fmt --all --check
-
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace --all-targets
+      - name: Workspace verify
+        run: cargo xtask run verify-full
 
       - name: Component build and parity checks
-        run: cargo components-build
+        run: cargo xtask run components-build
 
-      - name: WIT and repository smoke tests
-        run: cargo test -p wasmcloud-bindings -p wasmcloud-smoke-tests -p surrealdb-access
+      - name: Doctor UI toolchain
+        run: cargo xtask doctor --domain ui --ci
 
-      - name: Browser preview build
-        run: cargo xtask ui build --features desktop-tauri --dist target/trunk-ci-dist
-
-      - name: Tauri check
-        run: cargo check -p desktop_tauri --all-features
+      - name: UI verify
+        run: cargo xtask run ui-verify
 
       - name: Infrastructure posture validation
         run: |
@@ -140,17 +128,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "20"
-          cache: npm
           cache-dependency-path: infrastructure/pulumi/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Pulumi workspace tests
-        run: npm test
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          install-sccache: "false"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -164,8 +149,14 @@ jobs:
       - name: Pulumi login
         run: pulumi login "$PULUMI_BACKEND_URL"
 
+      - name: Doctor infra toolchain
+        run: cargo xtask doctor --domain infra --ci
+
+      - name: Infrastructure verify
+        run: cargo xtask run infra-verify
+
       - name: Preview stack
-        run: npm --workspace live run preview:${{ matrix.stack }}
+        run: cargo xtask infra preview --stack ${{ matrix.stack }}
 
   pr-gate:
     needs:

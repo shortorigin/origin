@@ -21,12 +21,17 @@ This workspace provides a modular Pulumi TypeScript codebase for provisioning AW
 
 ## Quick Start
 
-1. Bootstrap state backend:
+1. Diagnose local prerequisites from the repository root:
+```bash
+cargo doctor --domain infra
+```
+
+2. Bootstrap state backend:
 ```bash
 ./scripts/bootstrap-state.sh
 ```
 
-2. Configure secrets for live stacks:
+3. Configure secrets for live stacks:
 ```bash
 cd live
 pulumi stack select dev
@@ -37,12 +42,16 @@ pulumi config set --secret short-origin:tunnelSecret "<BASE64_32_BYTE_SECRET>"
 pulumi config set --secret short-origin:surrealdbRootPassword "<PASSWORD>"
 ```
 
-3. Preview and deploy:
+4. Verify, preview, and deploy:
 ```bash
-./scripts/preview.sh dev
-./scripts/preview.sh stage
+cd ../..
+cargo infra-verify
+cargo infra-preview --stack dev
+cargo infra-preview --stack stage
 ./scripts/deploy.sh dev
 ```
+
+The Cargo aliases provide the short day-to-day DX surface, and `cargo x infra ...` exposes the full underlying `xtask` commands when you need the explicit form. The npm workspace scripts remain the implementation detail used by those wrappers and by deployment-only flows.
 
 ## Required Environment Variables
 

@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "quant_strategy_promotion"
+touched_domains = ["capital_markets_data", "capital_markets_research", "capital_markets_execution", "capital_markets_portfolio", "capital_markets_risk", "compliance", "strategy_governance", "audit_assurance"]
+target_services = ["market-data-service", "quant-research-service", "execution-service", "portfolio-service", "trading-risk-service", "compliance-service", "governance-service", "evidence-service"]
+emits_evidence = true
+mutation_path_only = true

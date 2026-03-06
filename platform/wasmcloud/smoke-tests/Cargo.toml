@@ -6,8 +6,11 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+engineering-service = { path = "../../../services/engineering-service" }
 finance-service = { path = "../../../services/finance-service" }
 lattice-config = { path = "../lattice-config" }
+release-approval = { path = "../../../workflows/release_approval" }
+security-service = { path = "../../../services/security-service" }
 sdk-rs = { path = "../../sdk/sdk-rs" }
 treasury-disbursement = { path = "../../../workflows/treasury_disbursement" }
 

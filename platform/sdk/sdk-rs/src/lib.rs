@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use futures::future::{self, BoxFuture};
 use futures::stream::{self, BoxStream};
 
 use contracts::{
     AgentActionRequestV1, MarketDataBatchV1, PromotionRecommendationV1,
-    QuantStrategyPromotionRequestV1, ServiceBoundaryV1, WorkflowBoundaryV1,
+    QuantStrategyPromotionRequestV1, ReleaseApprovalRecordV1, ReleaseApprovalRequestV1,
+    ServiceBoundaryV1, WorkflowBoundaryV1,
 };
 use error_model::{InstitutionalError, InstitutionalResult};
 use events::EventEnvelopeV1;
@@ -34,6 +37,10 @@ pub struct UiDashboardSnapshotV1 {
 #[serde(tag = "command_type", content = "payload", rename_all = "snake_case")]
 pub enum PlatformCommandV1 {
     DispatchAgentAction(AgentActionRequestV1),
+    SubmitReleaseApproval {
+        action: AgentActionRequestV1,
+        request: ReleaseApprovalRequestV1,
+    },
     PreparePromotion {
         action: AgentActionRequestV1,
         request: QuantStrategyPromotionRequestV1,
@@ -46,6 +53,13 @@ pub enum PlatformCommandV1 {
 pub struct PlatformCommandAckV1 {
     pub command_id: String,
     pub accepted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "result_type", content = "payload", rename_all = "snake_case")]
+pub enum PlatformCommandResultV1 {
+    Ack(PlatformCommandAckV1),
+    ReleaseApproval(ReleaseApprovalRecordV1),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -65,9 +79,32 @@ pub enum PlatformQueryResultV1 {
 }
 
 pub trait InstitutionalPlatformTransport: Send + Sync {
-    fn execute_command(&self, command: PlatformCommandV1) -> TransportFuture<PlatformCommandAckV1>;
+    fn execute_command(
+        &self,
+        command: PlatformCommandV1,
+    ) -> TransportFuture<PlatformCommandResultV1>;
     fn execute_query(&self, query: PlatformQueryV1) -> TransportFuture<PlatformQueryResultV1>;
     fn subscribe_events(&self) -> EventSubscription;
+}
+
+impl<T> InstitutionalPlatformTransport for Arc<T>
+where
+    T: InstitutionalPlatformTransport + ?Sized,
+{
+    fn execute_command(
+        &self,
+        command: PlatformCommandV1,
+    ) -> TransportFuture<PlatformCommandResultV1> {
+        (**self).execute_command(command)
+    }
+
+    fn execute_query(&self, query: PlatformQueryV1) -> TransportFuture<PlatformQueryResultV1> {
+        (**self).execute_query(query)
+    }
+
+    fn subscribe_events(&self) -> EventSubscription {
+        (**self).subscribe_events()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -77,7 +114,7 @@ impl InstitutionalPlatformTransport for NoopPlatformTransport {
     fn execute_command(
         &self,
         _command: PlatformCommandV1,
-    ) -> TransportFuture<PlatformCommandAckV1> {
+    ) -> TransportFuture<PlatformCommandResultV1> {
         Box::pin(future::ready(Err(InstitutionalError::PolicyDenied {
             reason: "no platform transport configured".to_string(),
         })))
@@ -181,8 +218,15 @@ where
     pub async fn execute_command(
         &self,
         command: PlatformCommandV1,
-    ) -> InstitutionalResult<PlatformCommandAckV1> {
+    ) -> InstitutionalResult<PlatformCommandResultV1> {
         self.transport.execute_command(command).await
+    }
+
+    pub async fn execute_query(
+        &self,
+        query: PlatformQueryV1,
+    ) -> InstitutionalResult<PlatformQueryResultV1> {
+        self.transport.execute_query(query).await
     }
 
     pub async fn query_dashboard(&self) -> InstitutionalResult<UiDashboardSnapshotV1> {
@@ -192,9 +236,12 @@ where
             .await?
         {
             PlatformQueryResultV1::Dashboard(snapshot) => Ok(snapshot),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "dashboard query returned non-dashboard payload".to_string(),
-            }),
+            PlatformQueryResultV1::SupportedWorkflows(_)
+            | PlatformQueryResultV1::RecentEvents(_) => {
+                Err(InstitutionalError::InvariantViolation {
+                    invariant: "dashboard query returned non-dashboard payload".to_string(),
+                })
+            }
         }
     }
 
@@ -205,9 +252,45 @@ where
             .await?
         {
             PlatformQueryResultV1::SupportedWorkflows(workflows) => Ok(workflows),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "workflow query returned non-workflow payload".to_string(),
+            PlatformQueryResultV1::Dashboard(_) | PlatformQueryResultV1::RecentEvents(_) => {
+                Err(InstitutionalError::InvariantViolation {
+                    invariant: "workflow query returned non-workflow payload".to_string(),
+                })
+            }
+        }
+    }
+
+    pub async fn submit_release_approval(
+        &self,
+        action: AgentActionRequestV1,
+        request: ReleaseApprovalRequestV1,
+    ) -> InstitutionalResult<ReleaseApprovalRecordV1> {
+        match self
+            .execute_command(PlatformCommandV1::SubmitReleaseApproval { action, request })
+            .await?
+        {
+            PlatformCommandResultV1::ReleaseApproval(record) => Ok(record),
+            PlatformCommandResultV1::Ack(_) => Err(InstitutionalError::InvariantViolation {
+                invariant: "release approval command returned non-release payload".to_string(),
             }),
+        }
+    }
+
+    pub async fn query_recent_events(
+        &self,
+        limit: usize,
+    ) -> InstitutionalResult<Vec<EventEnvelopeV1>> {
+        match self
+            .transport
+            .execute_query(PlatformQueryV1::RecentEvents { limit })
+            .await?
+        {
+            PlatformQueryResultV1::RecentEvents(events) => Ok(events),
+            PlatformQueryResultV1::Dashboard(_) | PlatformQueryResultV1::SupportedWorkflows(_) => {
+                Err(InstitutionalError::InvariantViolation {
+                    invariant: "recent events query returned non-event payload".to_string(),
+                })
+            }
         }
     }
 
@@ -237,11 +320,13 @@ impl InstitutionalPlatformTransport for MemoryPlatformTransport {
     fn execute_command(
         &self,
         _command: PlatformCommandV1,
-    ) -> TransportFuture<PlatformCommandAckV1> {
-        Box::pin(future::ready(Ok(PlatformCommandAckV1 {
-            command_id: "memory-ack".to_string(),
-            accepted: true,
-        })))
+    ) -> TransportFuture<PlatformCommandResultV1> {
+        Box::pin(future::ready(Ok(PlatformCommandResultV1::Ack(
+            PlatformCommandAckV1 {
+                command_id: "memory-ack".to_string(),
+                accepted: true,
+            },
+        ))))
     }
 
     fn execute_query(&self, query: PlatformQueryV1) -> TransportFuture<PlatformQueryResultV1> {
@@ -310,6 +395,24 @@ mod tests {
                 .len(),
             0
         );
+        assert!(matches!(
+            client
+                .execute_command(PlatformCommandV1::DispatchAgentAction(
+                    AgentActionRequestV1 {
+                        action_id: "action-1".to_string(),
+                        actor_ref: ActorRef("ui-shell".to_string()),
+                        objective: "noop".to_string(),
+                        requested_workflow: "release_approval".to_string(),
+                        impact_tier: contracts::ImpactTier::Tier0,
+                        classification: Classification::Internal,
+                        required_approver_roles: Vec::new(),
+                        policy_refs: vec!["policy.test.v1".to_string()],
+                    }
+                ))
+                .await
+                .expect("command"),
+            PlatformCommandResultV1::Ack(_)
+        ));
         let events = client.subscribe_events().collect::<Vec<_>>().await;
         assert_eq!(events, vec![event]);
     }

@@ -102,15 +102,6 @@ impl EvidenceSink for EvidenceService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "evidence-service".to_owned(),
-        domain: "audit_assurance".to_owned(),
-        approved_workflows: vec![
-            "control_testing".to_owned(),
-            "treasury_disbursement".to_owned(),
-            "policy_exception".to_owned(),
-            "quant_strategy_promotion".to_owned(),
-        ],
-        owned_aggregates: vec!["evidence_manifest".to_owned(), "audit_event".to_owned()],
-    }
+    contracts::service_boundary_named("evidence-service")
+        .expect("generated evidence-service boundary")
 }

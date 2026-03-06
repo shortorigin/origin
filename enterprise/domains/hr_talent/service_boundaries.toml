@@ -1,4 +1,4 @@
 version = "v1"
 primary_service = "hr-service"
-approved_workflows = ["hiring_approval", "payroll"]
+approved_workflows = ["payroll"]
 owned_aggregates = ["personnel_record", "compensation_record"]

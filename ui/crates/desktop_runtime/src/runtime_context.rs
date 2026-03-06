@@ -6,7 +6,9 @@
 #![allow(clippy::clone_on_copy)]
 
 use leptos::*;
+use platform_gateway::PlatformGateway;
 use platform_host::HostServices;
+use sdk_rs::ReleasedUiAppV1;
 
 use crate::{
     app_runtime::{sync_runtime_sessions, AppRuntimeState},
@@ -36,6 +38,10 @@ pub struct DesktopRuntimeContext {
     pub dispatch: Callback<DesktopAction>,
     /// Shared shell engine and command registry.
     pub shell_engine: StoredValue<system_shell::ShellEngine>,
+    /// Shared platform gateway for typed workflow execution.
+    pub platform_gateway: StoredValue<PlatformGateway>,
+    /// Shared platform dashboard snapshot exposed to mounted apps.
+    pub platform_dashboard: RwSignal<sdk_rs::UiDashboardSnapshotV1>,
 }
 
 impl DesktopRuntimeContext {
@@ -68,6 +74,18 @@ pub fn DesktopProvider(
     let effects = create_rw_signal(Vec::<RuntimeEffect>::new());
     let app_runtime = create_rw_signal(AppRuntimeState::default());
     let shell_engine = store_value(system_shell::ShellEngine::new());
+    let release_apps = apps::app_registry()
+        .iter()
+        .filter(|entry| entry.show_in_launcher || entry.show_on_desktop)
+        .map(|entry| ReleasedUiAppV1 {
+            app_id: entry.app_id.to_string(),
+            display_name: entry.launcher_label.to_string(),
+            desktop_enabled: entry.show_on_desktop,
+        })
+        .collect::<Vec<_>>();
+    let gateway = PlatformGateway::shell_default(release_apps);
+    let platform_dashboard = create_rw_signal(gateway.dashboard_snapshot());
+    let platform_gateway = store_value(gateway);
 
     let dispatch = Callback::new(move |action: DesktopAction| {
         let mut desktop = state.get_untracked();
@@ -106,6 +124,8 @@ pub fn DesktopProvider(
         app_runtime,
         dispatch,
         shell_engine,
+        platform_gateway,
+        platform_dashboard,
     };
 
     provide_context(runtime.clone());

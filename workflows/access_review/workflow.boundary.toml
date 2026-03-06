@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "access_review"
+touched_domains = ["security", "infrastructure_it"]
+target_services = ["security-service", "identity-service"]
+emits_evidence = true
+mutation_path_only = true

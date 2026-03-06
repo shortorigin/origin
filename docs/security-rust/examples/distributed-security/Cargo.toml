@@ -1,0 +1,12 @@
+[package]
+name = "security-example-distributed-security"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+security-instrumentation = { path = "../../../../shared/security-instrumentation" }
+
+[lints]
+workspace = true

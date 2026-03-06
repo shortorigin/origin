@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "environment_change"
+touched_domains = ["infrastructure_it", "security"]
+target_services = ["infrastructure-service", "security-service"]
+emits_evidence = true
+mutation_path_only = true

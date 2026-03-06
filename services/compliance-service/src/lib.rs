@@ -217,19 +217,6 @@ pub fn validate_compliance_pack(report: &ComplianceReportV1) -> InstitutionalRes
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "compliance-service".to_owned(),
-        domain: "compliance".to_owned(),
-        approved_workflows: vec![
-            "compliance_attestation".to_owned(),
-            "policy_exception".to_owned(),
-            "quant_strategy_promotion".to_owned(),
-        ],
-        owned_aggregates: vec![
-            "control_attestation".to_owned(),
-            "compliance_checkpoint".to_owned(),
-            "compliance_pack".to_owned(),
-            "best_execution_report".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("compliance-service")
+        .expect("generated compliance-service boundary")
 }

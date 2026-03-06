@@ -12,6 +12,12 @@ pub struct PolicyService {
     expired_exceptions: BTreeSet<String>,
 }
 
+impl Default for PolicyService {
+    fn default() -> Self {
+        Self::institutional_default()
+    }
+}
+
 impl PolicyService {
     #[must_use]
     pub fn institutional_default() -> Self {
@@ -77,15 +83,5 @@ impl PolicyDecisionPort for PolicyService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "policy-service".to_owned(),
-        domain: "strategy_governance".to_owned(),
-        approved_workflows: vec![
-            "policy_exception".to_owned(),
-            "release_approval".to_owned(),
-            "treasury_disbursement".to_owned(),
-            "quant_strategy_promotion".to_owned(),
-        ],
-        owned_aggregates: vec!["policy_decision".to_owned(), "policy_exception".to_owned()],
-    }
+    contracts::service_boundary_named("policy-service").expect("generated policy-service boundary")
 }

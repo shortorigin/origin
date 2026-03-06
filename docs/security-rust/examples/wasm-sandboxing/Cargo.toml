@@ -1,0 +1,13 @@
+[package]
+name = "security-example-wasm-sandboxing"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+runtime-security = { path = "../../../../shared/runtime-security" }
+wasmcloud-bindings = { path = "../../../../platform/wasmcloud/bindings" }
+
+[lints]
+workspace = true

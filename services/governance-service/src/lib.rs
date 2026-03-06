@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use contracts::{
-    ModelApprovalStatusV1, ModelApprovalV1, PromotionRecommendationV1, ServiceBoundaryV1,
+    ModelApprovalStatusV1, ModelApprovalV1, MutationAuthorizationV1, PromotionRecommendationV1,
+    ServiceBoundaryV1,
 };
-use enforcement::ApprovedMutationContext;
-use error_model::InstitutionalResult;
+use error_model::{InstitutionalError, InstitutionalResult};
 
 #[derive(Debug, Default, Clone)]
 pub struct GovernanceService {
@@ -44,11 +44,15 @@ impl GovernanceService {
 
     pub fn record_recommendation(
         &mut self,
-        context: &ApprovedMutationContext,
+        authorization: &MutationAuthorizationV1,
         recommendation: PromotionRecommendationV1,
     ) -> InstitutionalResult<PromotionRecommendationV1> {
-        context.assert_workflow("quant_strategy_promotion")?;
-        context.assert_target_service("governance-service")?;
+        authorization
+            .assert_workflow("quant_strategy_promotion")
+            .map_err(|invariant| InstitutionalError::InvariantViolation { invariant })?;
+        authorization
+            .assert_target_service("governance-service")
+            .map_err(|invariant| InstitutionalError::InvariantViolation { invariant })?;
         self.recommendations.push(recommendation.clone());
         Ok(recommendation)
     }
@@ -61,19 +65,6 @@ impl GovernanceService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "governance-service".to_owned(),
-        domain: "strategy_governance".to_owned(),
-        approved_workflows: vec![
-            "strategy_review".to_owned(),
-            "policy_exception".to_owned(),
-            "quant_strategy_promotion".to_owned(),
-        ],
-        owned_aggregates: vec![
-            "governance_decision".to_owned(),
-            "institutional_invariant".to_owned(),
-            "promotion_recommendation".to_owned(),
-            "model_approval".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("governance-service")
+        .expect("generated governance-service boundary")
 }

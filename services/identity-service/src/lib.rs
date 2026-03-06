@@ -37,10 +37,6 @@ impl IdentityService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "identity-service".to_owned(),
-        domain: "strategy_governance".to_owned(),
-        approved_workflows: vec!["access_review".to_owned(), "policy_exception".to_owned()],
-        owned_aggregates: vec!["actor".to_owned(), "workload_identity".to_owned()],
-    }
+    contracts::service_boundary_named("identity-service")
+        .expect("generated identity-service boundary")
 }

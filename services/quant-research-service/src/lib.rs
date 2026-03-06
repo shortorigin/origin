@@ -127,12 +127,8 @@ pub fn ai_assisted_summary(results: &[ExperimentResultV1]) -> String {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "quant-research-service".to_owned(),
-        domain: "capital_markets_research".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
-        owned_aggregates: vec!["experiment_result".to_owned(), "research_task".to_owned()],
-    }
+    contracts::service_boundary_named("quant-research-service")
+        .expect("generated quant-research-service boundary")
 }
 
 #[cfg(test)]

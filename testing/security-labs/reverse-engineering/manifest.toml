@@ -1,0 +1,3 @@
+domain = "reverse-engineering"
+status = "scaffold"
+issue_seed = "[Docs]: add reverse-engineering walkthroughs for synthetic Wasm components"

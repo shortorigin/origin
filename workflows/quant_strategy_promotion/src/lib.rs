@@ -56,31 +56,8 @@ pub struct QuantStrategyPromotionReport {
 
 #[must_use]
 pub fn workflow_boundary() -> WorkflowBoundaryV1 {
-    WorkflowBoundaryV1 {
-        workflow_name: "quant_strategy_promotion".to_owned(),
-        touched_domains: vec![
-            "capital_markets_data".to_owned(),
-            "capital_markets_research".to_owned(),
-            "capital_markets_execution".to_owned(),
-            "capital_markets_portfolio".to_owned(),
-            "capital_markets_risk".to_owned(),
-            "compliance".to_owned(),
-            "strategy_governance".to_owned(),
-            "audit_assurance".to_owned(),
-        ],
-        target_services: vec![
-            "market-data-service".to_owned(),
-            "quant-research-service".to_owned(),
-            "execution-service".to_owned(),
-            "portfolio-service".to_owned(),
-            "trading-risk-service".to_owned(),
-            "compliance-service".to_owned(),
-            "governance-service".to_owned(),
-            "evidence-service".to_owned(),
-        ],
-        emits_evidence: true,
-        mutation_path_only: true,
-    }
+    contracts::workflow_boundary_named("quant_strategy_promotion")
+        .expect("generated quant_strategy_promotion boundary")
 }
 
 pub fn execute<P, A, E>(
@@ -413,7 +390,7 @@ where
     };
 
     let recommendation = engine.execute_mutation(guarded_request, |context| {
-        governance_service.record_recommendation(context, recommendation.clone())
+        governance_service.record_recommendation(&context.authorization(), recommendation.clone())
     })?;
 
     Ok(QuantStrategyPromotionReport {

@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "payroll"
+touched_domains = ["finance_treasury", "hr_talent"]
+target_services = ["finance-service", "hr-service"]
+emits_evidence = true
+mutation_path_only = true

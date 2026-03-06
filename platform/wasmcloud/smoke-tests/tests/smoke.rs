@@ -1,9 +1,12 @@
+use engineering_service::component::component_binding as engineering_component;
 use finance_service::component::component_binding as finance_component;
 use lattice_config::{LatticeConfigV1, RolloutTargetV1};
+use release_approval::component::component_binding as release_approval_component;
 use sdk_rs::{
     InstitutionalPlatformClientV1, InstitutionalPlatformRuntimeClient, MemoryPlatformTransport,
     ReleasedUiAppV1,
 };
+use security_service::component::component_binding as security_component;
 use treasury_disbursement::component::component_binding as treasury_component;
 
 #[tokio::test]
@@ -15,13 +18,26 @@ async fn lattice_config_and_sdk_smoke_round_trip_component_descriptors() {
             namespace: "runtime".to_string(),
             policy_group: "institutional-default".to_string(),
         },
-        components: vec![finance_component(), treasury_component()],
+        components: vec![
+            finance_component(),
+            treasury_component(),
+            engineering_component(),
+            security_component(),
+            release_approval_component(),
+        ],
     };
 
     let manifest = InstitutionalPlatformClientV1 {
         client_name: "control-center".to_string(),
-        supported_services: vec![finance_service::service_boundary()],
-        supported_workflows: vec![treasury_disbursement::workflow_boundary()],
+        supported_services: vec![
+            finance_service::service_boundary(),
+            engineering_service::service_boundary(),
+            security_service::service_boundary(),
+        ],
+        supported_workflows: vec![
+            treasury_disbursement::workflow_boundary(),
+            release_approval::workflow_boundary(),
+        ],
         lattice_config: Some(lattice.clone()),
     };
     let dashboard = manifest.dashboard_snapshot(

@@ -30,7 +30,7 @@ impl Default for WasmRuntimePolicy {
 }
 
 enum StrategyExecutor {
-    Wasmtime(WasmtimeGuestStrategy),
+    Wasmtime(Box<WasmtimeGuestStrategy>),
     #[cfg(any(test, feature = "in-memory"))]
     InMemory(Box<dyn StrategyModule>),
 }
@@ -85,7 +85,7 @@ impl StrategySandbox {
             });
         }
 
-        let mut module = WasmtimeGuestStrategy::new(wasm_bytes)?;
+        let mut module = Box::new(WasmtimeGuestStrategy::new(wasm_bytes)?);
         module.init(config)?;
         Self::enforce_memory_limit(&self.policy, &module.snapshot_state()?)?;
         self.modules.insert(
@@ -422,7 +422,8 @@ impl WasmtimeGuestStrategy {
 
     fn write_input(&mut self, input: &[u8]) -> TradingResult<(i32, i32)> {
         let required_end = INPUT_OFFSET_BYTES + input.len();
-        let current_bytes = self.memory.size(&self.store) as usize * WASM_PAGE_BYTES;
+        let current_pages = usize::try_from(self.memory.size(&self.store)).unwrap_or(usize::MAX);
+        let current_bytes = current_pages.saturating_mul(WASM_PAGE_BYTES);
         if required_end > current_bytes {
             let missing = required_end - current_bytes;
             let additional_pages = missing.div_ceil(WASM_PAGE_BYTES) as u64;
@@ -461,11 +462,11 @@ impl WasmtimeGuestStrategy {
 fn pack_output_handle(ptr: usize, len: usize) -> i64 {
     let ptr = u64::try_from(ptr).unwrap_or(u64::MAX) & 0xffff_ffff;
     let len = u64::try_from(len).unwrap_or(u64::MAX) & 0xffff_ffff;
-    ((ptr << 32) | len) as i64
+    i64::from_ne_bytes(((ptr << 32) | len).to_ne_bytes())
 }
 
 fn unpack_output_handle(handle: i64) -> TradingResult<(usize, usize)> {
-    let raw = handle as u64;
+    let raw = u64::from_ne_bytes(handle.to_ne_bytes());
     let ptr = usize::try_from(raw >> 32).map_err(|error| TradingError::Parse {
         source_name: "wasmtime".to_string(),
         details: error.to_string(),

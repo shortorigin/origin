@@ -1,4 +1,11 @@
-version = "v1"
-primary_service = "audit-service"
-approved_workflows = ["control_testing", "evidence_review"]
+version = "v2"
+
+[[services]]
+service_name = "audit-service"
+approved_workflows = ["compliance_attestation", "control_testing"]
 owned_aggregates = ["audit_finding", "evidence_manifest"]
+
+[[services]]
+service_name = "evidence-service"
+approved_workflows = ["control_testing", "policy_exception", "quant_strategy_promotion", "treasury_disbursement"]
+owned_aggregates = ["evidence_manifest", "audit_event"]

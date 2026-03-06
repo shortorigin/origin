@@ -1,0 +1,23 @@
+[package]
+name = "runtime-security-labs"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+contracts = { path = "../../../schemas/crates/contracts" }
+finance-service = { path = "../../../services/finance-service" }
+runtime-security = { path = "../../../shared/runtime-security" }
+serde_json.workspace = true
+strategy-sandbox = { path = "../../../platform/runtime/strategy-sandbox" }
+trading-core = { path = "../../../shared/trading-core" }
+trading-errors = { path = "../../../shared/trading-errors" }
+wasmcloud-bindings = { path = "../../../platform/wasmcloud/bindings" }
+wit-parser = "0.221.3"
+
+[dev-dependencies]
+chrono.workspace = true
+
+[lints]
+workspace = true

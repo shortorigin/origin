@@ -7,6 +7,7 @@ version.workspace = true
 
 [dependencies]
 approval-service = { path = "../../services/approval-service" }
+component-descriptors = { path = "../../platform/wasmcloud/component-descriptors" }
 contracts = { path = "../../schemas/crates/contracts" }
 evidence-sdk = { path = "../../shared/evidence-sdk" }
 finance-service = { path = "../../services/finance-service" }

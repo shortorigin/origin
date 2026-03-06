@@ -1,0 +1,60 @@
+name: Setup Rust
+description: Install a Rust toolchain, cache cargo state, and install common cargo-based developer tools.
+
+inputs:
+  toolchain:
+    description: Rust toolchain channel or version.
+    required: false
+    default: stable
+  components:
+    description: Comma-separated rustup components.
+    required: false
+    default: ""
+  targets:
+    description: Comma-separated rustup targets.
+    required: false
+    default: ""
+  install-sccache:
+    description: Install and cache sccache for later cargo invocations.
+    required: false
+    default: "true"
+  cargo-bins:
+    description: Newline-separated cargo install package names.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Cache cargo
+      uses: Swatinem/rust-cache@v2
+
+    - name: Cache sccache
+      if: ${{ inputs.install-sccache == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/sccache
+        key: ${{ runner.os }}-sccache-${{ hashFiles('Cargo.lock') }}-${{ inputs.toolchain }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
+
+    - name: Install sccache
+      if: ${{ inputs.install-sccache == 'true' }}
+      shell: bash
+      run: cargo install sccache --locked
+
+    - name: Install cargo tools
+      if: ${{ inputs.cargo-bins != '' }}
+      shell: bash
+      run: |
+        while IFS= read -r tool; do
+          [[ -z "${tool}" ]] && continue
+          cargo install "${tool}" --locked
+        done <<< "$(printf '%s\n' "${{ inputs.cargo-bins }}")"

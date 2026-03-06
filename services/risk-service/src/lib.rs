@@ -18,13 +18,5 @@ impl RiskService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "risk-service".to_owned(),
-        domain: "compliance".to_owned(),
-        approved_workflows: vec![
-            "policy_exception".to_owned(),
-            "continuity_activation".to_owned(),
-        ],
-        owned_aggregates: vec!["risk_record".to_owned(), "treatment_plan".to_owned()],
-    }
+    contracts::service_boundary_named("risk-service").expect("generated risk-service boundary")
 }

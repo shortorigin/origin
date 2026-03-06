@@ -1,0 +1,3 @@
+domain = "fuzzing"
+status = "scaffold"
+issue_seed = "[Infra]: expand nightly fuzz automation for the security teaching crates"

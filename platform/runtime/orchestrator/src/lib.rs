@@ -19,6 +19,11 @@ impl<P, A, E> WorkflowEngine<P, A, E> {
             evidence_sink,
         }
     }
+
+    #[must_use]
+    pub fn into_parts(self) -> (P, A, E) {
+        (self.policy_port, self.approval_port, self.evidence_sink)
+    }
 }
 
 impl<P, A, E> WorkflowEngine<P, A, E>

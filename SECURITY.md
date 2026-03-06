@@ -28,3 +28,7 @@ The public repository should enable:
 - secret scanning and push protection
 - Dependabot alerts and automated update PRs
 - CodeQL analysis for Rust and JavaScript/TypeScript surfaces
+
+## Public Security Research Corpus
+
+The `docs/security-rust/` initiative is public by default, but unresolved platform-specific weaknesses, exploit chains against live-relevant surfaces, and sensitive operational details must stay in the private reporting path until remediation and approval are complete.

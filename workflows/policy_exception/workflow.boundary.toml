@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "policy_exception"
+touched_domains = ["strategy_governance", "compliance"]
+target_services = ["policy-service", "approval-service", "compliance-service"]
+emits_evidence = true
+mutation_path_only = true

@@ -1,4 +1,4 @@
 version = "v1"
 primary_service = "finance-service"
-approved_workflows = ["payroll", "treasury_disbursement"]
+approved_workflows = ["payroll", "procurement", "treasury_disbursement"]
 owned_aggregates = ["treasury_ledger", "payroll_batch"]

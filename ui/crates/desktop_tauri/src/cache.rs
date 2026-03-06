@@ -138,6 +138,7 @@ mod tests {
     use std::path::PathBuf;
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use tempfile::TempDir;
 
     fn temp_file_path() -> PathBuf {
         let now = SystemTime::now()
@@ -151,15 +152,11 @@ mod tests {
         ))
     }
 
-    fn temp_dir_path() -> PathBuf {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let path =
-            std::env::temp_dir().join(format!("desktop_tauri_cache_dir_{}_{}", process::id(), now));
-        fs::create_dir_all(&path).expect("create temp dir");
-        path
+    fn temp_dir() -> TempDir {
+        tempfile::Builder::new()
+            .prefix("desktop_tauri_cache_dir_")
+            .tempdir()
+            .expect("create temp dir")
     }
 
     #[test]
@@ -186,8 +183,8 @@ mod tests {
 
     #[test]
     fn scoped_cache_store_rejects_empty_cache_name_or_key() {
-        let root = temp_dir_path();
-        let store = ScopedCacheStore::from_root(&root).expect("init scoped cache store");
+        let root = temp_dir();
+        let store = ScopedCacheStore::from_root(root.path()).expect("init scoped cache store");
 
         let cases = [("", "k"), ("cache", ""), ("", "")];
         for (cache_name, key) in cases {
@@ -205,16 +202,14 @@ mod tests {
                 .expect_err("empty cache_name/key delete should fail");
             assert_eq!(delete_err, expected);
         }
-
-        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn scoped_cache_store_reports_malformed_map_parse_error() {
-        let root = temp_dir_path();
-        let cache_path = root.join("cache.json");
+        let root = temp_dir();
+        let cache_path = root.path().join("cache.json");
         fs::write(&cache_path, "{\"bad\":").expect("write malformed cache map");
-        let store = ScopedCacheStore::from_root(&root).expect("init scoped cache store");
+        let store = ScopedCacheStore::from_root(root.path()).expect("init scoped cache store");
 
         let err = store
             .get_text(
@@ -229,7 +224,5 @@ mod tests {
             )),
             "unexpected error: {err}"
         );
-
-        let _ = fs::remove_dir_all(root);
     }
 }

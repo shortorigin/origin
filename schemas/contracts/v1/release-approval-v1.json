@@ -1,0 +1,16 @@
+{
+  "name": "ReleaseApprovalV1",
+  "version": "v1",
+  "fields": [
+    "release_id",
+    "build_ref",
+    "artifact_digest",
+    "test_evidence_ref",
+    "environment",
+    "security_ready",
+    "approved_by_roles",
+    "evidence_refs",
+    "audit_event_ids",
+    "release_window_ref"
+  ]
+}

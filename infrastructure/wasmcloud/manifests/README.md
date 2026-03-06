@@ -8,5 +8,5 @@ delivery workflows for each promoted environment:
 - `prod/lattice-config.json`
 
 The checked-in tree keeps the environment directories stable. Delivery workflows render concrete
-manifests with `cargo xtask delivery render-manifest ...`, upload them as workflow artifacts, and
+manifests with `cargo xtask artifacts delivery manifest ...`, upload them as workflow artifacts, and
 attach release-candidate or production manifests to GitHub Releases for rollback and audit.

@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
 use contracts::{
     Classification, ExperimentResultV1, FillV1, LimitBreachRecordV1, PayloadRefV1,
-    PortfolioSnapshotV1, PromotionGateV1, PromotionRecommendationV1, SignalV1,
+    PortfolioSnapshotV1, PromotionGateV1, PromotionRecommendationV1, ReleaseApprovalRecordV1,
+    ReleaseApprovalRequestV1, SignalV1,
 };
 use identity::ActorRef;
 use serde::{Deserialize, Serialize};
@@ -105,6 +106,25 @@ pub struct PromotionGateEvaluatedV1 {
     pub recommendation: PromotionRecommendationV1,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseApprovalRequestedV1 {
+    pub action_id: String,
+    pub request: ReleaseApprovalRequestV1,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseApprovalApprovedV1 {
+    pub action_id: String,
+    pub record: ReleaseApprovalRecordV1,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseApprovalDeniedV1 {
+    pub action_id: String,
+    pub release_id: String,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "event_type", content = "payload", rename_all = "snake_case")]
 pub enum CapitalMarketsEventPayloadV1 {
@@ -116,4 +136,12 @@ pub enum CapitalMarketsEventPayloadV1 {
     PortfolioSnapshotted(PortfolioSnapshottedV1),
     ExperimentRanked(ExperimentRankedV1),
     PromotionGateEvaluated(PromotionGateEvaluatedV1),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "event_type", content = "payload", rename_all = "snake_case")]
+pub enum PlatformWorkflowEventPayloadV1 {
+    ReleaseApprovalRequested(ReleaseApprovalRequestedV1),
+    ReleaseApprovalApproved(ReleaseApprovalApprovedV1),
+    ReleaseApprovalDenied(ReleaseApprovalDeniedV1),
 }

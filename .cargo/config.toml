@@ -1,10 +1,34 @@
 [alias]
+# Escape hatch for the full xtask surface.
 xtask = "run -p xtask --"
-ui-dev = "xtask ui dev"
-ui-build = "xtask ui build"
-tauri-dev = "xtask tauri dev"
-tauri-build = "xtask tauri build"
-components-build = "xtask components build"
-verify-fast = "xtask verify profile fast"
-verify-ui = "xtask verify profile ui"
-verify-full = "xtask verify profile full"
+x = "xtask"
+
+# Workflow discovery and task execution.
+tasks = "xtask tasks list"
+task = "xtask run"
+doctor = "xtask doctor"
+
+# Canonical validation shortcuts.
+verify = "xtask run verify-full"
+verify-fast = "xtask run verify-fast"
+verify-full = "xtask run verify-full"
+verify-ui = "xtask run ui-verify"
+ui-verify = "xtask run ui-verify"
+infra-verify = "xtask run infra-verify"
+security-audit = "xtask run security-audit"
+
+# UI and desktop workflows.
+ui-dev = "xtask ui web dev"
+ui-build = "xtask ui web build"
+ui-e2e = "xtask ui e2e"
+tauri-dev = "xtask ui tauri dev"
+tauri-build = "xtask ui tauri build"
+
+# Task and artifact helpers.
+components-build = "xtask run components-build"
+infra-preview = "xtask infra preview"
+security-book-build = "xtask docs security-book build"
+security-book-preview = "xtask docs security-book preview"
+security-book-test = "xtask run docs-security-book-test"
+schema-export = "xtask artifacts schemas export --output-dir target/generated/schemas"
+cache-status = "xtask cache status"

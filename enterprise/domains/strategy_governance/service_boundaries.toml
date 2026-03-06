@@ -1,4 +1,21 @@
-version = "v1"
-primary_service = "governance-service"
-approved_workflows = ["strategy_review", "policy_exception", "quant_strategy_promotion"]
+version = "v2"
+
+[[services]]
+service_name = "approval-service"
+approved_workflows = ["engine", "policy_exception", "quant_strategy_promotion", "release_approval", "treasury_disbursement"]
+owned_aggregates = ["approval_request", "approval_decision"]
+
+[[services]]
+service_name = "governance-service"
+approved_workflows = ["policy_exception", "quant_strategy_promotion", "strategy_review"]
 owned_aggregates = ["governance_decision", "institutional_invariant", "promotion_recommendation", "model_approval"]
+
+[[services]]
+service_name = "identity-service"
+approved_workflows = ["access_review", "policy_exception"]
+owned_aggregates = ["actor", "workload_identity"]
+
+[[services]]
+service_name = "policy-service"
+approved_workflows = ["engine", "policy_exception", "quant_strategy_promotion", "release_approval", "treasury_disbursement"]
+owned_aggregates = ["policy_decision", "policy_exception"]

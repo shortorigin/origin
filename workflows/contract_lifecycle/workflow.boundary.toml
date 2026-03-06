@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "contract_lifecycle"
+touched_domains = ["legal", "sales_revenue"]
+target_services = ["legal-service", "revenue-service"]
+emits_evidence = true
+mutation_path_only = true

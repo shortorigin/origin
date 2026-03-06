@@ -13,13 +13,8 @@ use policy_sdk::{ApprovalVerificationPort, PolicyDecisionPort};
 
 #[must_use]
 pub fn workflow_boundary() -> WorkflowBoundaryV1 {
-    WorkflowBoundaryV1 {
-        workflow_name: "treasury_disbursement".to_owned(),
-        touched_domains: vec!["finance_treasury".to_owned(), "hr_talent".to_owned()],
-        target_services: vec!["finance-service".to_owned(), "approval-service".to_owned()],
-        emits_evidence: true,
-        mutation_path_only: true,
-    }
+    contracts::workflow_boundary_named("treasury_disbursement")
+        .expect("generated treasury_disbursement boundary")
 }
 
 pub fn execute<P, A, E>(
@@ -48,6 +43,6 @@ where
     };
 
     engine.execute_mutation(guarded_request, |context| {
-        finance_service.record_disbursement(context, request.clone())
+        finance_service.record_disbursement(&context.authorization(), request.clone())
     })
 }

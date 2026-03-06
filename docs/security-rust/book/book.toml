@@ -1,0 +1,12 @@
+[book]
+authors = ["Short Origin"]
+language = "en"
+src = "src"
+title = "Systems Security Engineering with Rust"
+
+[build]
+build-dir = "../../../target/security-rust/book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/shortorigin/short-origin"

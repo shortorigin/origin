@@ -1,7 +1,7 @@
 use chrono::Utc;
 use contracts::{
     ApprovalDecisionV1, ApprovalRequestV1, Classification, EvidenceManifestV1, ImpactTier,
-    PolicyDecisionOutcome, PolicyDecisionRequestV1, PolicyDecisionV1,
+    MutationAuthorizationV1, PolicyDecisionOutcome, PolicyDecisionRequestV1, PolicyDecisionV1,
 };
 use error_model::{InstitutionalError, InstitutionalResult};
 use evidence_sdk::EvidenceSink;
@@ -103,8 +103,28 @@ impl ApprovedMutationContext {
     }
 
     #[must_use]
+    pub fn decision(&self) -> &PolicyDecisionV1 {
+        &self.decision
+    }
+
+    #[must_use]
     pub fn trace_context(&self) -> &TraceContext {
         &self.trace_context
+    }
+
+    #[must_use]
+    pub fn authorization(&self) -> MutationAuthorizationV1 {
+        MutationAuthorizationV1 {
+            workflow_name: self.workflow_name.clone(),
+            target_service: self.target_service.clone(),
+            target_aggregate: self.target_aggregate.clone(),
+            correlation_id: self.trace_context.correlation_id.clone(),
+            approved_by_roles: self
+                .approvals
+                .iter()
+                .map(|decision| decision.approver_role)
+                .collect(),
+        }
     }
 }
 

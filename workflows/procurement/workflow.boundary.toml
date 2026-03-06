@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "procurement"
+touched_domains = ["procurement_vendor", "finance_treasury"]
+target_services = ["procurement-service", "finance-service"]
+emits_evidence = true
+mutation_path_only = true

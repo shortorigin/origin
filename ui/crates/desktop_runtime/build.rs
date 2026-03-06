@@ -42,15 +42,48 @@ struct WallpaperManifest {
 }
 
 fn app_manifest_paths(root: &Path) -> Vec<PathBuf> {
-    ["control_center", "terminal", "settings"]
-        .iter()
-        .map(|name| {
-            root.join("..")
-                .join("apps")
-                .join(name)
-                .join("app.manifest.toml")
-        })
-        .collect()
+    let apps_root = root.join("..").join("apps");
+    let compat_root = root.join("compat_manifests");
+    println!("cargo:rerun-if-changed={}", apps_root.display());
+    println!("cargo:rerun-if-changed={}", compat_root.display());
+
+    let mut paths = Vec::new();
+    paths.extend(collect_manifest_paths(&apps_root));
+    paths.extend(collect_manifest_paths(&compat_root));
+    paths.sort();
+    paths
+}
+
+fn collect_manifest_paths(root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let entries = fs::read_dir(root).unwrap_or_else(|err| {
+        panic!(
+            "failed to read manifest directory {}: {err}",
+            root.display()
+        )
+    });
+
+    for entry in entries {
+        let entry = entry.unwrap_or_else(|err| {
+            panic!(
+                "failed to read manifest directory entry in {}: {err}",
+                root.display()
+            )
+        });
+        let path = entry.path();
+        if path.is_dir() {
+            let manifest_path = path.join("app.manifest.toml");
+            if manifest_path.exists() {
+                paths.push(manifest_path);
+            }
+        } else if path.file_name().is_some_and(|name| {
+            name == "app.manifest.toml" || name.to_string_lossy().ends_with(".app.manifest.toml")
+        }) {
+            paths.push(path);
+        }
+    }
+
+    paths
 }
 
 fn main() {

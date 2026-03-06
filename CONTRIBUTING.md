@@ -38,12 +38,34 @@ Use milestones to group issues into release objectives such as `v0.1 - MVP` and 
 
 ## Verification
 
-Run the baseline checks from the repository root:
+Start with a quick environment check from the repository root:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-targets
+cargo doctor --domain all
+cargo tasks
 ```
 
-If your change affects dependency security posture, validate `cargo audit` locally or rely on the `Security Scan` workflow in CI.
+Run the canonical root validation command from the repository root:
+
+```bash
+cargo verify
+cargo ui-verify
+cargo xtask run verify-full
+cargo xtask workspace verify --profile full
+```
+
+The Cargo aliases are the ergonomic day-to-day surface. They still resolve to the same `xtask` commands, so `cargo x ...` is always available when you want the full underlying shape. Use the domain-specific entrypoints when you are working in narrower areas:
+
+```bash
+cargo ui-e2e --scene shell-default
+cargo security-book-test
+cargo infra-verify
+cargo infra-preview --stack dev
+cargo security-audit
+```
+
+If your change affects dependency security posture, run `cargo security-audit` locally or rely on the `Security` workflow in CI.
+
+## Security Research Book
+
+Changes under `docs/security-rust/`, `testing/security-labs/`, and the security teaching crates must stay public-safe, synthetic, and reproducible. Use [docs/security-rust/CONTRIBUTING.md](/Users/justinshort/short%20origin/docs/security-rust/CONTRIBUTING.md) for chapter structure and [docs/security-rust/DISCLOSURE.md](/Users/justinshort/short%20origin/docs/security-rust/DISCLOSURE.md) for disclosure rules.

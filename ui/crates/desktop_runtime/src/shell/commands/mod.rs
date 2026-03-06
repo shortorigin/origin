@@ -11,6 +11,7 @@ mod filesystem;
 mod inspect;
 mod theme;
 mod windows;
+mod workflow;
 
 pub(super) fn builtin_registrations(runtime: DesktopRuntimeContext) -> Vec<AppCommandRegistration> {
     let mut registrations = Vec::new();
@@ -28,5 +29,6 @@ pub(super) fn builtin_registrations(runtime: DesktopRuntimeContext) -> Vec<AppCo
     registrations.extend(filesystem::registrations(runtime.clone()));
     registrations.extend(data::registrations());
     registrations.extend(config::registrations(runtime.clone()));
+    registrations.extend(workflow::registrations(runtime));
     registrations
 }

@@ -1,0 +1,5 @@
+{
+  "name": "ReleaseApprovalRequestedV1",
+  "version": "v1",
+  "fields": ["action_id", "release_id", "build_ref", "environment"]
+}

@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "treasury_disbursement"
+touched_domains = ["finance_treasury", "hr_talent"]
+target_services = ["finance-service", "approval-service"]
+emits_evidence = true
+mutation_path_only = true

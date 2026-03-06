@@ -119,6 +119,7 @@ mod tests {
     use std::path::PathBuf;
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use tempfile::TempDir;
 
     fn temp_file_path() -> PathBuf {
         let now = SystemTime::now()
@@ -132,15 +133,11 @@ mod tests {
         ))
     }
 
-    fn temp_dir_path() -> PathBuf {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let path =
-            std::env::temp_dir().join(format!("desktop_tauri_prefs_dir_{}_{}", process::id(), now));
-        fs::create_dir_all(&path).expect("create temp dir");
-        path
+    fn temp_dir() -> TempDir {
+        tempfile::Builder::new()
+            .prefix("desktop_tauri_prefs_dir_")
+            .tempdir()
+            .expect("create temp dir")
     }
 
     #[test]
@@ -165,8 +162,8 @@ mod tests {
 
     #[test]
     fn scoped_prefs_store_rejects_empty_key_for_all_operations() {
-        let root = temp_dir_path();
-        let store = ScopedPrefsStore::from_root(&root).expect("init scoped prefs store");
+        let root = temp_dir();
+        let store = ScopedPrefsStore::from_root(root.path()).expect("init scoped prefs store");
 
         let expected = "Preference key must not be empty";
         let load_err = store.load("").expect_err("empty key load should fail");
@@ -177,16 +174,14 @@ mod tests {
         assert_eq!(save_err, expected);
         let delete_err = store.delete("").expect_err("empty key delete should fail");
         assert_eq!(delete_err, expected);
-
-        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn scoped_prefs_store_reports_malformed_map_parse_error() {
-        let root = temp_dir_path();
-        let prefs_path = root.join("prefs.json");
+        let root = temp_dir();
+        let prefs_path = root.path().join("prefs.json");
         fs::write(&prefs_path, "{\"bad\":").expect("write malformed prefs map");
-        let store = ScopedPrefsStore::from_root(&root).expect("init scoped prefs store");
+        let store = ScopedPrefsStore::from_root(root.path()).expect("init scoped prefs store");
 
         let err = store
             .load("retrodesk.explorer.prefs.v1")
@@ -198,7 +193,5 @@ mod tests {
             )),
             "unexpected error: {err}"
         );
-
-        let _ = fs::remove_dir_all(root);
     }
 }

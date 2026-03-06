@@ -53,16 +53,8 @@ impl RiskPolicyEngine for TradingRiskService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "trading-risk-service".to_owned(),
-        domain: "capital_markets_risk".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
-        owned_aggregates: vec![
-            "trading_risk_state".to_owned(),
-            "kill_switch".to_owned(),
-            "risk_limit_breach".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("trading-risk-service")
+        .expect("generated trading-risk-service boundary")
 }
 
 #[cfg(test)]

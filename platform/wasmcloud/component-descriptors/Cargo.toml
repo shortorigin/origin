@@ -1,0 +1,12 @@
+[package]
+name = "component-descriptors"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
+
+[dependencies]
+wasmcloud-bindings = { path = "../bindings" }
+
+[lints]
+workspace = true

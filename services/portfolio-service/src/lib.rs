@@ -67,15 +67,8 @@ impl PortfolioLedger for PortfolioService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "portfolio-service".to_owned(),
-        domain: "capital_markets_portfolio".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
-        owned_aggregates: vec![
-            "portfolio_snapshot".to_owned(),
-            "allocation_policy".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("portfolio-service")
+        .expect("generated portfolio-service boundary")
 }
 
 #[cfg(test)]

@@ -27,10 +27,5 @@ impl AuditService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "audit-service".to_owned(),
-        domain: "audit_assurance".to_owned(),
-        approved_workflows: vec!["control_testing".to_owned(), "evidence_review".to_owned()],
-        owned_aggregates: vec!["audit_finding".to_owned(), "evidence_manifest".to_owned()],
-    }
+    contracts::service_boundary_named("audit-service").expect("generated audit-service boundary")
 }

@@ -221,14 +221,6 @@ impl EventDrivenStrategyEngine {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "execution-service".to_owned(),
-        domain: "capital_markets_execution".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
-        owned_aggregates: vec![
-            "order_record".to_owned(),
-            "execution_session".to_owned(),
-            "fill_record".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("execution-service")
+        .expect("generated execution-service boundary")
 }

@@ -1,0 +1,14 @@
+schema_version = 1
+app_id = "system.notepad"
+display_name = "Notepad"
+version = "0.1.0"
+runtime_contract_version = "2.0.0"
+requested_capabilities = ["window", "state"]
+single_instance = false
+suspend_policy = "on-minimize"
+show_in_launcher = false
+show_on_desktop = false
+
+[window_defaults]
+width = 640
+height = 480

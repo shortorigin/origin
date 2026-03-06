@@ -1,1 +1,7 @@
 * @shortorigin/core-maintainers
+docs/security-rust/ @shortorigin/core-maintainers
+testing/security-labs/ @shortorigin/core-maintainers
+shared/secure-patterns/ @shortorigin/core-maintainers
+shared/exploit-mitigation/ @shortorigin/core-maintainers
+shared/runtime-security/ @shortorigin/core-maintainers
+shared/security-instrumentation/ @shortorigin/core-maintainers

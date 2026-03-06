@@ -283,15 +283,8 @@ fn split_symbol(value: &str) -> TradingResult<(&str, &str)> {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "market-data-service".to_owned(),
-        domain: "capital_markets_data".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
-        owned_aggregates: vec![
-            "market_dataset".to_owned(),
-            "normalization_report".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("market-data-service")
+        .expect("generated market-data-service boundary")
 }
 
 impl Default for CoinbaseAdapter {

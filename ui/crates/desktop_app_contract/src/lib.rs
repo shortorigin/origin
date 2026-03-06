@@ -14,7 +14,7 @@
 
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use futures::future::LocalBoxFuture;
 use leptos::{Callable, Callback, ReadSignal, RwSignal, View};
@@ -25,7 +25,11 @@ use platform_host::{
     ExplorerPermissionMode, ExplorerPermissionState, HostCapabilities, PrefsStore, WallpaperConfig,
     WallpaperImportRequest, WallpaperLibrarySnapshot,
 };
-use sdk_rs::UiDashboardSnapshotV1;
+use sdk_rs::{
+    EventSubscription, InstitutionalPlatformRuntimeClient, InstitutionalPlatformTransport,
+    PlatformCommandResultV1, PlatformCommandV1, PlatformQueryResultV1, PlatformQueryV1,
+    UiDashboardSnapshotV1,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use system_shell_contract::{
@@ -1197,12 +1201,60 @@ impl CommandService {
 pub struct PlatformService {
     /// Reactive platform dashboard snapshot owned by the runtime shell.
     pub dashboard: ReadSignal<UiDashboardSnapshotV1>,
+    client: InstitutionalPlatformRuntimeClient<Arc<dyn InstitutionalPlatformTransport>>,
 }
 
 impl PlatformService {
     /// Creates a platform dashboard service.
-    pub fn new(dashboard: ReadSignal<UiDashboardSnapshotV1>) -> Self {
-        Self { dashboard }
+    pub fn new(
+        dashboard: ReadSignal<UiDashboardSnapshotV1>,
+        client: InstitutionalPlatformRuntimeClient<Arc<dyn InstitutionalPlatformTransport>>,
+    ) -> Self {
+        Self { dashboard, client }
+    }
+
+    /// Executes a typed platform command through the shared SDK client.
+    pub fn execute_command(
+        &self,
+        command: PlatformCommandV1,
+    ) -> LocalBoxFuture<'static, error_model::InstitutionalResult<PlatformCommandResultV1>> {
+        let client = self.client.clone();
+        Box::pin(async move { client.execute_command(command).await })
+    }
+
+    /// Executes a typed platform query through the shared SDK client.
+    pub fn execute_query(
+        &self,
+        query: PlatformQueryV1,
+    ) -> LocalBoxFuture<'static, error_model::InstitutionalResult<PlatformQueryResultV1>> {
+        let client = self.client.clone();
+        Box::pin(async move { client.execute_query(query).await })
+    }
+
+    /// Submits a governed release approval request.
+    pub fn submit_release_approval(
+        &self,
+        action: contracts::AgentActionRequestV1,
+        request: contracts::ReleaseApprovalRequestV1,
+    ) -> LocalBoxFuture<'static, error_model::InstitutionalResult<contracts::ReleaseApprovalRecordV1>>
+    {
+        let client = self.client.clone();
+        Box::pin(async move { client.submit_release_approval(action, request).await })
+    }
+
+    /// Queries recent platform events.
+    pub fn recent_events(
+        &self,
+        limit: usize,
+    ) -> LocalBoxFuture<'static, error_model::InstitutionalResult<Vec<events::EventEnvelopeV1>>>
+    {
+        let client = self.client.clone();
+        Box::pin(async move { client.query_recent_events(limit).await })
+    }
+
+    /// Subscribes to the live platform event stream.
+    pub fn subscribe_events(&self) -> EventSubscription {
+        self.client.subscribe_events()
     }
 }
 
@@ -1259,7 +1311,7 @@ impl AppServices {
         wallpaper_current: ReadSignal<WallpaperConfig>,
         wallpaper_preview: ReadSignal<Option<WallpaperConfig>>,
         wallpaper_library: ReadSignal<WallpaperLibrarySnapshot>,
-        platform_dashboard: ReadSignal<UiDashboardSnapshotV1>,
+        platform: PlatformService,
         commands: CommandService,
     ) -> Self {
         Self {
@@ -1288,7 +1340,7 @@ impl AppServices {
             },
             notifications: NotificationService { sender },
             ipc: IpcService { sender },
-            platform: PlatformService::new(platform_dashboard),
+            platform,
             commands,
         }
     }

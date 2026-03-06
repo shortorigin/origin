@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "release_approval"
+touched_domains = ["engineering_platform", "security"]
+target_services = ["engineering-service", "security-service"]
+emits_evidence = true
+mutation_path_only = true

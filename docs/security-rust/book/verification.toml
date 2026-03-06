@@ -1,0 +1,54 @@
+[[chapters]]
+page = "src/tutorials/runtime-policy-lab.md"
+commands = [
+  "cargo xtask docs security-book test",
+  "cargo nextest run -p secure-patterns -p exploit-mitigation -p runtime-security -p security-instrumentation -p runtime-security-labs",
+  "cargo check -p security-example-wasm-sandboxing",
+]
+artifacts = [
+  "testing/security-labs/runtime-security/fixtures/oversized-state-id.txt",
+  "testing/security-labs/runtime-security/fixtures/busy-loop.wat",
+  "testing/security-labs/runtime-security/fixtures/guest-invalid-json.wat",
+]
+examples = ["docs/security-rust/examples/wasm-sandboxing/Cargo.toml"]
+research = ["docs/security-rust/research/experiments/runtime-policy-matrix.md"]
+
+[[chapters]]
+page = "src/how-to/harden-wasm-components.md"
+commands = [
+  "cargo test -p wasmcloud-smoke-tests -p runtime-security-labs",
+  "cargo check -p security-example-distributed-security",
+]
+artifacts = [
+  "platform/wasmcloud/bindings/src/lib.rs",
+  "schemas/wit/v1/platform.wit",
+]
+examples = ["docs/security-rust/examples/distributed-security/Cargo.toml"]
+research = ["docs/security-rust/research/threat-models/runtime-plane-threat-model.md"]
+
+[[chapters]]
+page = "src/reference/toolchain-and-validation.md"
+commands = [
+  "cargo xtask docs security-book build",
+  "cargo xtask docs security-book preview",
+  "cargo fuzz run parse_policy_line -- -max_total_time=30",
+]
+artifacts = [
+  "shared/exploit-mitigation/fuzz/fuzz_targets/parse_policy_line.rs",
+  "testing/security-labs/runtime-security/manifest.toml",
+]
+examples = [
+  "docs/security-rust/examples/network-security/Cargo.toml",
+  "docs/security-rust/examples/infrastructure-hardening/Cargo.toml",
+]
+
+[[chapters]]
+page = "src/explanation/trust-boundaries-and-evidence.md"
+artifacts = [
+  "docs/adr/0002-trust-zones-and-evidence.md",
+  "enterprise/policies/control_catalog.toml",
+]
+research = [
+  "docs/security-rust/research/threat-models/runtime-plane-threat-model.md",
+  "docs/security-rust/research/architecture-notes/public-safety-and-disclosure.md",
+]

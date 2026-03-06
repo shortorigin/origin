@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "engine"
+touched_domains = ["strategy_governance"]
+target_services = ["policy-service", "approval-service"]
+emits_evidence = true
+mutation_path_only = true

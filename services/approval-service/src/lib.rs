@@ -56,18 +56,6 @@ impl ApprovalVerificationPort for ApprovalService {
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
-    ServiceBoundaryV1 {
-        service_name: "approval-service".to_owned(),
-        domain: "strategy_governance".to_owned(),
-        approved_workflows: vec![
-            "policy_exception".to_owned(),
-            "release_approval".to_owned(),
-            "treasury_disbursement".to_owned(),
-            "quant_strategy_promotion".to_owned(),
-        ],
-        owned_aggregates: vec![
-            "approval_request".to_owned(),
-            "approval_decision".to_owned(),
-        ],
-    }
+    contracts::service_boundary_named("approval-service")
+        .expect("generated approval-service boundary")
 }

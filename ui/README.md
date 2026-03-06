@@ -36,11 +36,17 @@ Out of scope:
 ## Build/Test Commands
 Run from repo root:
 ```bash
+cargo doctor --domain ui
 cargo ui-dev
 cargo ui-build
 cargo tauri-build
+cargo ui-e2e --all-scenes
+cargo ui-e2e --scene shell-default
+cargo ui-verify
 cargo verify-ui
 ```
+
+These aliases stay intentionally close to the underlying `xtask` structure. `cargo ui-verify` runs the tracked compile checks, the browser preview build, and the Playwright browser scenes that exercise the runtime's deterministic `e2e-scene` and `os:e2e-ready` hooks, while `cargo x ui ...` remains available for the full command surface.
 
 ## Integration Patterns
 - Tauri is the authoritative runtime; browser/WASM remains for preview and parity validation.

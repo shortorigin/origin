@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "incident_response"
+touched_domains = ["operations", "security", "resilience_continuity"]
+target_services = ["operations-service", "security-service", "resilience-service"]
+emits_evidence = true
+mutation_path_only = true

@@ -1,0 +1,13 @@
+(module
+  (memory (export "memory") 1)
+  (data (i32.const 64) "not-json")
+  (data (i32.const 128) "[]")
+  (func (export "init") (param i32 i32) (result i32)
+    i32.const 0)
+  (func (export "on-market-event") (param i32 i32) (result i64)
+    i64.const 549755813890)
+  (func (export "on-timer") (param i32 i32) (result i64)
+    i64.const 549755813890)
+  (func (export "snapshot-state") (result i64)
+    i64.const 274877906952)
+)

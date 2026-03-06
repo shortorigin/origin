@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use finance_service::component::component_binding_with_artifact as finance_component_binding;
+use component_descriptors::finance_service::component_binding_with_artifact as finance_component_binding;
+use component_descriptors::treasury_disbursement::component_binding_with_artifact as treasury_component_binding;
 use lattice_config::{LatticeConfigV1, RolloutTargetV1};
-use treasury_disbursement::component::component_binding_with_artifact as treasury_component_binding;
 
 const DEFAULT_REGISTRY: &str = "ghcr.io/shortorigin";
 const PENDING_DIGEST: &str = "sha256:pending";

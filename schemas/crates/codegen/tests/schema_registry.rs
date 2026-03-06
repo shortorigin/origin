@@ -6,8 +6,8 @@ fn schema_registry_embeds_contract_event_and_record_documents() {
     let event_schemas = embedded_event_schemas().unwrap();
     let surrealdb_schemas = embedded_surrealdb_schemas().unwrap();
 
-    assert_eq!(contract_schemas.len(), 25);
-    assert_eq!(event_schemas.len(), 9);
+    assert_eq!(contract_schemas.len(), 26);
+    assert_eq!(event_schemas.len(), 12);
     assert_eq!(surrealdb_schemas.len(), 1);
 
     assert!(contract_schemas

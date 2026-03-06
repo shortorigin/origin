@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.shortorigin.os.desktop",
   "build": {
-    "beforeDevCommand": "cargo xtask ui dev --features desktop-tauri --dist target/trunk-tauri-dev --port 1420 --no-open",
-    "beforeBuildCommand": "cargo xtask ui build --release --features desktop-tauri --dist target/trunk-tauri-dist",
+    "beforeDevCommand": "cargo xtask ui web dev --features desktop-tauri --dist target/trunk-tauri-dev --port 1420 --no-open",
+    "beforeBuildCommand": "cargo xtask ui web build --release --features desktop-tauri --dist target/trunk-tauri-dist",
     "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../../../target/trunk-tauri-dist"
   },

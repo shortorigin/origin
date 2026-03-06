@@ -4,9 +4,12 @@ use super::*;
 use crate::app_runtime::ensure_window_session;
 use crate::apps;
 use crate::shell;
-use desktop_app_contract::{AppMountContext, AppServices, ApplicationId, CapabilitySet};
+use desktop_app_contract::{
+    AppMountContext, AppServices, ApplicationId, CapabilitySet, PlatformService,
+};
 use leptos::ev::MouseEvent;
-use sdk_rs::{InstitutionalPlatformClientV1, ReleasedUiAppV1};
+use sdk_rs::{InstitutionalPlatformRuntimeClient, InstitutionalPlatformTransport};
+use std::sync::Arc;
 use system_ui::{
     Icon, IconName, IconSize, WindowBody as SystemWindowBody,
     WindowControlButton as SystemWindowControlButton, WindowControls as SystemWindowControls,
@@ -347,26 +350,11 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         apps::app_requested_capabilities_by_id(&app_id).to_vec(),
         runtime.host.get_value().host_capabilities(),
     ));
-    let platform_dashboard = create_rw_signal(
-        InstitutionalPlatformClientV1 {
-            client_name: "short-origin-shell".to_string(),
-            supported_services: Vec::new(),
-            supported_workflows: Vec::new(),
-            lattice_config: None,
-        }
-        .dashboard_snapshot(
-            apps::app_registry()
-                .iter()
-                .filter(|entry| entry.show_in_launcher || entry.show_on_desktop)
-                .map(|entry| ReleasedUiAppV1 {
-                    app_id: entry.app_id.to_string(),
-                    display_name: entry.launcher_label.to_string(),
-                    desktop_enabled: entry.show_on_desktop,
-                })
-                .collect(),
-            true,
-        ),
-    );
+    let platform_gateway = runtime.platform_gateway.get_value();
+    let platform_transport: Arc<dyn InstitutionalPlatformTransport> =
+        Arc::new(platform_gateway.clone());
+    let platform_client =
+        InstitutionalPlatformRuntimeClient::new(platform_gateway.manifest(), platform_transport);
     let services = store_value(AppServices::new(
         command_sender,
         capabilities.get_untracked(),
@@ -380,7 +368,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         wallpaper_current.read_only(),
         wallpaper_preview.read_only(),
         wallpaper_library.read_only(),
-        platform_dashboard.read_only(),
+        PlatformService::new(runtime.platform_dashboard.read_only(), platform_client),
         shell::build_command_service(
             runtime.clone(),
             app_id.clone(),

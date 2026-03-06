@@ -7,6 +7,10 @@ version.workspace = true
 
 [dependencies]
 contracts = { path = "../../schemas/crates/contracts" }
+error-model = { path = "../../shared/error-model" }
+
+[dependencies.component-descriptors]
+path = "../../platform/wasmcloud/component-descriptors"
 
 [lints]
 workspace = true

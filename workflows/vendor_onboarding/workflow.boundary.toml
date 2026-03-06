@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "vendor_onboarding"
+touched_domains = ["procurement_vendor", "security"]
+target_services = ["procurement-service", "security-service"]
+emits_evidence = true
+mutation_path_only = true

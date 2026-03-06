@@ -10,5 +10,5 @@ show_in_launcher = true
 show_on_desktop = true
 
 [window_defaults]
-width = 900
-height = 620
+width = 820
+height = 560

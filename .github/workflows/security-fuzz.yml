@@ -1,0 +1,30 @@
+name: Security Fuzz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  exploit-mitigation-fuzz:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shared/exploit-mitigation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          install-sccache: "false"
+          cargo-bins: |
+            cargo-fuzz
+
+      - name: Run parser fuzz smoke
+        run: cargo fuzz run parse_policy_line -- -max_total_time=30

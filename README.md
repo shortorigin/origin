@@ -31,18 +31,58 @@ Primary contributor docs:
 - [CONTRIBUTING.md](/Users/justinshort/short%20origin/CONTRIBUTING.md)
 - [DEVELOPMENT_MODEL.md](/Users/justinshort/short%20origin/DEVELOPMENT_MODEL.md)
 - [SECURITY.md](/Users/justinshort/short%20origin/SECURITY.md)
+- [Security Rust Initiative](/Users/justinshort/short%20origin/docs/security-rust/README.md)
+
+## Bootstrap
+
+Run these from the repository root when setting up or diagnosing a local environment:
+
+```bash
+cargo doctor --domain all
+cargo tasks
+cargo verify
+```
+
+Cargo aliases in [.cargo/config.toml](/Users/justinshort/short%20origin/.cargo/config.toml) provide a short front door for the `xtask` substrate. Use `cargo x ...` as the escape hatch for any full `xtask` command, `cargo tasks` to list registered workflows, `cargo task <task-id>` to run a named task, and `cargo doctor --domain <domain>` to inspect prerequisites.
 
 ## Verification
 
 Run from the repository root:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-targets
+cargo verify
+cargo ui-verify
+cargo ui-e2e --all-scenes
+cargo infra-verify
+cargo infra-preview --stack dev
+cargo security-audit
+cargo xtask run verify-full
+cargo xtask workspace verify --profile full
 ```
 
-The GitHub CI baseline also includes `cargo audit`.
+The aliases are ergonomic wrappers over the same `xtask` surface. `cargo verify` maps to the canonical `cargo xtask run verify-full`, and the existing `workspace verify --profile full` alias remains supported for compatibility.
+
+Other common task entrypoints:
+
+```bash
+cargo xtask run components-build
+cargo xtask run ui-verify
+cargo xtask ui e2e --all-scenes
+cargo xtask run docs-security-book-test
+cargo xtask run infra-verify
+cargo xtask infra preview --stack dev
+cargo xtask run security-audit
+cargo xtask artifacts schemas export --output-dir target/generated/schemas
+cargo xtask cache status
+```
+
+Security book contributors can also use the direct docs subcommands:
+
+```bash
+cargo xtask docs security-book build
+cargo xtask docs security-book preview
+cargo xtask docs security-book test
+```
 
 ## Delivery and Release
 

@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "disaster_recovery_test"
+touched_domains = ["resilience_continuity", "infrastructure_it"]
+target_services = ["resilience-service", "infrastructure-service"]
+emits_evidence = true
+mutation_path_only = true

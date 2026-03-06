@@ -1,0 +1,6 @@
+version = "v1"
+workflow_name = "continuity_activation"
+touched_domains = ["resilience_continuity", "operations", "security"]
+target_services = ["resilience-service", "operations-service", "security-service"]
+emits_evidence = true
+mutation_path_only = true

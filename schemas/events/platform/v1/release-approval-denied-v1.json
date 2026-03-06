@@ -1,0 +1,5 @@
+{
+  "name": "ReleaseApprovalDeniedV1",
+  "version": "v1",
+  "fields": ["action_id", "release_id", "reason"]
+}

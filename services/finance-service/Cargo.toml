@@ -6,6 +6,7 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+component-descriptors = { path = "../../platform/wasmcloud/component-descriptors" }
 contracts = { path = "../../schemas/crates/contracts" }
 enforcement = { path = "../../platform/runtime/enforcement" }
 error-model = { path = "../../shared/error-model" }

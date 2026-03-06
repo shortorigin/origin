@@ -117,6 +117,39 @@ pub struct ApprovalDecisionV1 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MutationAuthorizationV1 {
+    pub workflow_name: String,
+    pub target_service: String,
+    pub target_aggregate: String,
+    pub correlation_id: String,
+    pub approved_by_roles: Vec<InstitutionalRole>,
+}
+
+impl MutationAuthorizationV1 {
+    pub fn assert_workflow(&self, expected: &str) -> Result<(), String> {
+        if self.workflow_name == expected {
+            Ok(())
+        } else {
+            Err(format!(
+                "workflow `{}` cannot execute mutation reserved for `{expected}`",
+                self.workflow_name
+            ))
+        }
+    }
+
+    pub fn assert_target_service(&self, expected: &str) -> Result<(), String> {
+        if self.target_service == expected {
+            Ok(())
+        } else {
+            Err(format!(
+                "service `{}` cannot mutate target service `{expected}`",
+                self.target_service
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExceptionRecordV1 {
     pub exception_id: String,
     pub policy_ref: String,
@@ -160,6 +193,64 @@ pub struct AgentActionRequestV1 {
     pub classification: Classification,
     pub required_approver_roles: Vec<InstitutionalRole>,
     pub policy_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseApprovalRequestV1 {
+    pub release_id: String,
+    pub build_ref: String,
+    pub artifact_digest: String,
+    pub test_evidence_ref: String,
+    pub environment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecurityReleaseAssessmentV1 {
+    pub release_id: String,
+    pub environment: String,
+    pub ready: bool,
+    pub control_refs: Vec<String>,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReleaseApprovalRecordV1 {
+    pub release_id: String,
+    pub environment: String,
+    pub build_ref: String,
+    pub artifact_digest: String,
+    pub test_evidence_ref: String,
+    pub security_ready: bool,
+    pub approved_by_roles: Vec<InstitutionalRole>,
+    pub evidence_refs: Vec<String>,
+    pub audit_event_ids: Vec<String>,
+    pub release_window_ref: String,
+}
+
+impl ReleaseApprovalRecordV1 {
+    #[must_use]
+    pub fn new(
+        request: &ReleaseApprovalRequestV1,
+        approved_by_roles: Vec<InstitutionalRole>,
+        evidence_refs: Vec<String>,
+        audit_event_ids: Vec<String>,
+    ) -> Self {
+        Self {
+            release_id: request.release_id.clone(),
+            environment: request.environment.clone(),
+            build_ref: request.build_ref.clone(),
+            artifact_digest: request.artifact_digest.clone(),
+            test_evidence_ref: request.test_evidence_ref.clone(),
+            security_ready: true,
+            approved_by_roles,
+            evidence_refs,
+            audit_event_ids,
+            release_window_ref: format!(
+                "release-window/{}/{}",
+                request.environment, request.release_id
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -341,6 +432,24 @@ pub struct WorkflowBoundaryV1 {
     pub target_services: Vec<String>,
     pub emits_evidence: bool,
     pub mutation_path_only: bool,
+}
+
+include!(concat!(env!("OUT_DIR"), "/generated_boundaries.rs"));
+
+#[must_use]
+pub fn service_boundary_catalog_document() -> Value {
+    serde_json::json!({
+        "version": "v1",
+        "service_boundaries": all_service_boundaries(),
+    })
+}
+
+#[must_use]
+pub fn workflow_boundary_catalog_document() -> Value {
+    serde_json::json!({
+        "version": "v1",
+        "workflow_boundaries": all_workflow_boundaries(),
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

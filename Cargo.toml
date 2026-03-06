@@ -1,12 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
+  "docs/security-rust/examples/wasm-sandboxing",
+  "docs/security-rust/examples/network-security",
+  "docs/security-rust/examples/distributed-security",
+  "docs/security-rust/examples/infrastructure-hardening",
   "shared/error-model",
   "shared/telemetry",
   "shared/identity",
   "shared/policy-sdk",
   "shared/evidence-sdk",
+  "shared/secure-patterns",
   "shared/surrealdb-access",
+  "shared/exploit-mitigation",
+  "shared/runtime-security",
+  "shared/security-instrumentation",
   "shared/trading-errors",
   "shared/trading-core",
   "shared/trading-sim",
@@ -19,9 +27,11 @@ members = [
   "schemas/crates/codegen",
   "platform/runtime/orchestrator",
   "platform/runtime/enforcement",
+  "platform/runtime/platform-gateway",
   "platform/runtime/strategy-sandbox",
   "platform/sdk/sdk-rs",
   "platform/wasmcloud/bindings",
+  "platform/wasmcloud/component-descriptors",
   "platform/wasmcloud/lattice-config",
   "platform/wasmcloud/smoke-tests",
   "services/governance-service",
@@ -79,6 +89,7 @@ members = [
   "ui/crates/desktop_runtime",
   "ui/crates/site",
   "ui/crates/desktop_tauri",
+  "testing/security-labs/runtime-security",
   "xtask",
 ]
 
@@ -98,7 +109,7 @@ sha2 = "0.10.9"
 thiserror = "2.0.17"
 toml = "0.8.23"
 tracing = "0.1.41"
-uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uuid = { version = "1.18.1", features = ["js", "serde", "v4"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

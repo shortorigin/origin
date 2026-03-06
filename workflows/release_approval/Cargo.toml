@@ -6,7 +6,24 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+component-descriptors = { path = "../../platform/wasmcloud/component-descriptors" }
 contracts = { path = "../../schemas/crates/contracts" }
+enforcement = { path = "../../platform/runtime/enforcement" }
+engineering-service = { path = "../../services/engineering-service" }
+error-model = { path = "../../shared/error-model" }
+evidence-sdk = { path = "../../shared/evidence-sdk" }
+evidence-service = { path = "../../services/evidence-service" }
+orchestrator = { path = "../../platform/runtime/orchestrator" }
+policy-sdk = { path = "../../shared/policy-sdk" }
+security-service = { path = "../../services/security-service" }
+serde_json.workspace = true
+wasmcloud-bindings = { path = "../../platform/wasmcloud/bindings" }
+
+[dev-dependencies]
+approval-service = { path = "../../services/approval-service" }
+chrono.workspace = true
+identity = { path = "../../shared/identity" }
+policy-service = { path = "../../services/policy-service" }
 
 [lints]
 workspace = true

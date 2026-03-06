@@ -12,5 +12,9 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 
+[build-dependencies]
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
+
 [lints]
 workspace = true
