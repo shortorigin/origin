@@ -59,7 +59,7 @@ dependencies = [
  "error-model",
  "identity",
  "serde",
- "toml 0.8.23",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -1261,7 +1261,7 @@ version = "0.1.0"
 dependencies = [
  "error-model",
  "serde",
- "toml 0.8.23",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -1787,7 +1787,7 @@ dependencies = [
  "system_ui",
  "tabled",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 0.9.12+spec-1.1.0",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -5473,7 +5473,7 @@ version = "0.1.0"
 dependencies = [
  "error-model",
  "serde",
- "toml 0.8.23",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -10245,7 +10245,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "toml 0.8.23",
+ "toml 0.9.12+spec-1.1.0",
  "treasury-disbursement",
 ]
 

@@ -96,7 +96,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 sha2 = "0.10.9"
 thiserror = "2.0.17"
-toml = "0.8.23"
+toml = "0.9.12"
 tracing = "0.1.41"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
