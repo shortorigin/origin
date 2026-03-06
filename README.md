@@ -25,6 +25,13 @@ Short Origin uses a GitHub-native Scrumban model.
 3. Open a pull request with a conventional title such as `feat(auth): add oauth provider`.
 4. Merge to `main` through squash merge after review and required checks pass.
 
+Operational conventions:
+
+- `main` is the only long-lived branch and must stay releasable.
+- Required checks are `Governance / validate`, `CI / pr-gate`, and `Security / security-gate`.
+- Delivery and release promotion happen through GitHub Actions workflows and protected environments, not ad hoc local deploys.
+- Workflow helper logic under `.github/actions/` is repository-owned and must stay audited and documented.
+
 Primary contributor docs:
 
 - [ARCHITECTURE.md](/Users/justinshort/short%20origin/ARCHITECTURE.md)
@@ -58,3 +65,8 @@ Short Origin uses a GitHub-native, trunk-based delivery model:
 Digest-pinned environment manifests are rendered under
 [`infrastructure/wasmcloud/manifests`](/Users/justinshort/short%20origin/infrastructure/wasmcloud/manifests)
 and attached to GitHub Releases for rollback and audit.
+
+GitHub workflow and governance rollout details live in
+[docs/process/github-governance-rollout.md](/Users/justinshort/short%20origin/docs/process/github-governance-rollout.md)
+and
+[docs/process/github-actions-supply-chain.md](/Users/justinshort/short%20origin/docs/process/github-actions-supply-chain.md).

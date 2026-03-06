@@ -44,7 +44,7 @@ else
     [[ -z "${file}" ]] && continue
 
     case "${file}" in
-      .cargo/*|AGENTS.md|Cargo.toml|Cargo.lock|shared/*|enterprise/*|schemas/*|platform/*|services/*|workflows/*|ui/*|xtask/*|agents/*|.github/workflows/*|.github/scripts/*)
+      .cargo/*|AGENTS.md|Cargo.toml|Cargo.lock|shared/*|enterprise/*|schemas/*|platform/*|services/*|workflows/*|ui/*|xtask/*|agents/*|.github/workflows/*|.github/scripts/*|.github/actions/*|.github/actions/**/*)
         rust_changed=true
         ;;
     esac

@@ -1,0 +1,35 @@
+name: Install Pulumi
+description: Install a pinned Pulumi CLI release with checksum verification.
+
+inputs:
+  version:
+    description: Pulumi CLI version.
+    required: false
+    default: "3.225.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Pulumi from pinned release
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        version="${{ inputs.version }}"
+        if [[ "${version}" != "3.225.0" ]]; then
+          echo "Unsupported Pulumi version ${version}. Update the local action checksum before changing versions."
+          exit 1
+        fi
+
+        archive="pulumi-v${version}-linux-x64.tar.gz"
+        url="https://github.com/pulumi/pulumi/releases/download/v${version}/${archive}"
+        checksum="63d0cb6ed5a6c1d7c398d34f97759bc8538ca6e800adb829d993135d5a1d3aab"
+        install_root="${RUNNER_TEMP}/short-origin-pulumi/${version}"
+
+        mkdir -p "${install_root}"
+        curl --fail --silent --show-error --location "${url}" --output "${install_root}/${archive}"
+        echo "${checksum}  ${install_root}/${archive}" | sha256sum --check --status
+
+        tar -xzf "${install_root}/${archive}" -C "${install_root}"
+        echo "${install_root}/pulumi" >> "${GITHUB_PATH}"
+        "${install_root}/pulumi/pulumi" version

@@ -48,8 +48,16 @@ The repo sync covers:
 - labels
 - milestones
 - repository rulesets for `main` protection and branch naming
-- required code owner review on `main`
+- pull-request review and thread-resolution requirements sourced from [`.github/governance.toml`](/Users/justinshort/short%20origin/.github/governance.toml)
 - auto-merge enablement for protected-branch fallback
+
+Repository workflow standards that should be present after rollout:
+
+- `main` is protected and requires PR-based merges.
+- branch names follow the approved issue-driven prefixes and include an issue id.
+- required checks are `Governance / validate`, `CI / pr-gate`, and `Security / security-gate`.
+- release and environment promotion run only through GitHub Actions workflows.
+- issue forms, PR templates, CODEOWNERS, and workflow ownership docs are committed in-repo.
 
 ## Manual GitHub UI Steps
 
@@ -63,6 +71,8 @@ The GitHub CLI currently does not cover all project-view and workflow configurat
 6. Create GitHub environments `dev`, `stage`, and `production`.
 7. Configure `production` to require `@shortorigin/core-maintainers` approval and disable self-approval.
 8. Enable secret scanning, push protection, and private vulnerability reporting.
+9. Review Actions policy so GitHub-authored actions are allowed and any non-GitHub helper logic is mirrored locally under `.github/actions/`.
+10. Confirm environment secrets exist for `AWS_ROLE_TO_ASSUME`, `PULUMI_STATE_BUCKET`, and `CLOUDFLARE_API_TOKEN`.
 
 ## Required Checks
 
@@ -82,3 +92,12 @@ Create the same secret names in each environment where needed:
 
 `dev` deploys automatically from `main`, `stage` is reserved for release candidates, and
 `production` is reserved for approved final releases.
+
+## Ongoing Maintenance
+
+When repository process changes:
+
+1. Update [AGENTS.md](/Users/justinshort/short%20origin/AGENTS.md) with policy or boundary changes.
+2. Update [DEVELOPMENT_MODEL.md](/Users/justinshort/short%20origin/DEVELOPMENT_MODEL.md) and [CONTRIBUTING.md](/Users/justinshort/short%20origin/CONTRIBUTING.md) with contributor-facing procedure changes.
+3. Update workflow ownership notes in [docs/process/github-actions-supply-chain.md](/Users/justinshort/short%20origin/docs/process/github-actions-supply-chain.md) when Actions dependencies or mirroring strategy changes.
+4. Re-run the `cargo xtask github sync ... --dry-run` commands if rulesets or governance config changed.

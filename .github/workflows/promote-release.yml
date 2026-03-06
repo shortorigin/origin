@@ -52,13 +52,10 @@ jobs:
           cache-dependency-path: infrastructure/pulumi/package-lock.json
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: ./.github/actions/install-rust
 
       - name: Setup ORAS
-        uses: oras-project/setup-oras@v1
+        uses: ./.github/actions/install-oras
 
       - name: Login to GHCR
         run: echo "${{ github.token }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -103,13 +100,13 @@ jobs:
         run: npm ci
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: ./.github/actions/configure-aws-oidc
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: us-west-2
 
       - name: Install Pulumi CLI
-        uses: pulumi/setup-pulumi@v3
+        uses: ./.github/actions/install-pulumi
 
       - name: Pulumi login
         working-directory: infrastructure/pulumi

@@ -55,6 +55,28 @@ cargo test --workspace --all-targets
 - Contract or schema changes MUST include compatibility tests or fixture updates.
 - CI failures block merge; no bypass without documented incident approval.
 
+## Git and GitHub Workflow Standards
+- All material work MUST begin with a same-repository GitHub issue or an explicitly linked tracking issue.
+- Contributors MUST use short-lived branches from `main`; long-lived feature branches are not part of the operating model.
+- Branch names MUST follow one of these prefixes: `feature/`, `fix/`, `infra/`, `docs/`, `refactor/`, `research/`.
+- Branch names MUST include the issue id and a short kebab-case summary, for example `feature/42-wasmcloud-billing-adapter`.
+- Direct commits or force-pushes to `main` are prohibited.
+- Pull requests MUST link their governing issue with `Closes #<id>` or the equivalent repository issue URL.
+- Pull request titles and squash-merge commit messages MUST use conventional commits in the form `type(scope): description`.
+- Pull requests MUST describe summary, technical changes, verification performed, and deployment or migration impact.
+- Contributors SHOULD keep pull requests small enough to review quickly; prefer follow-up issues over broad, mixed-purpose changes.
+- Required checks for merge are `Governance / validate`, `CI / pr-gate`, and `Security / security-gate`.
+- Merge strategy is squash merge; merge commits and rebase merges are not the default path.
+- New commits on an open pull request reset review expectations; contributors SHOULD re-request review after materially changing code or contracts.
+
+## Operational Conventions
+- `main` is the only long-lived branch and MUST remain releasable.
+- Environment promotion flows through GitHub Actions only: `Delivery Dev` from `main`, `Release Candidate` for `stage`, and `Promote Release` for `production`.
+- Workflow helper logic under `.github/actions/` is repository-owned and MUST remain auditable, pinned, and checksum-verified where it downloads binaries.
+- Changes to `.github/workflows/`, `.github/actions/`, `.github/scripts/`, contracts, or delivery manifests MUST include notes on operational impact in the PR description.
+- Secrets, cloud credentials, and production mutations MUST flow through GitHub environments, OIDC, and approved workflows rather than developer-local credentials.
+- Incident exceptions to branch protection, CI, or release procedure MUST be documented in the issue or PR that authorizes the exception.
+
 ## wasmCloud + Wasmtime Integration Model
 - Services are designed for wasmCloud deployment with Wasmtime-compatible modules.
 - Nomad and surrounding infrastructure deploy lattice hosts and support infrastructure, not native per-service binaries.
@@ -100,3 +122,4 @@ cargo test --workspace --all-targets
   - verification status.
 - Agents may propose changes outside their domain but may not execute boundary-crossing mutations without policy/workflow authorization.
 - When requirements conflict, agents prioritize contract correctness, policy compliance, and test pass criteria in that order.
+- Agents editing GitHub workflows, branch protection assumptions, or release automation MUST update the related documentation in `DEVELOPMENT_MODEL.md`, `CONTRIBUTING.md`, and `docs/process/` when behavior changes.

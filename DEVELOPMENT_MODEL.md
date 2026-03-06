@@ -11,6 +11,7 @@ This repository uses a GitHub-native Scrumban workflow built around issues, pull
 3. Every merge flows through a reviewed pull request.
 4. Required checks must pass before merge.
 5. Work stays visible on the organization Project board.
+6. Delivery and release operations run through repository-owned GitHub workflows.
 
 ## Flow
 
@@ -65,6 +66,13 @@ Examples:
 - `fix(db): correct surrealdb transaction handling`
 - `docs(api): update platform sdk examples`
 
+Operational branch rules:
+
+- Branch from the current `main`.
+- Keep one issue per branch unless the work is explicitly coupled.
+- Rebase or merge `main` as needed to stay current, but do not rewrite shared branch history after review starts unless coordinated in the PR.
+- Use empty commits only for workflow retriggers or operational validation, and explain the reason in the commit message.
+
 ## Pull Requests
 
 Every PR must include:
@@ -75,14 +83,24 @@ Every PR must include:
 - testing strategy
 - deployment impact
 
+Recommended PR lifecycle:
+
+1. Open the PR as soon as the change is reviewable.
+2. Link the governing issue with a closing keyword.
+3. Request review after local verification is complete.
+4. Respond to review with follow-up commits or explicit rationale.
+5. Merge with squash after required checks and approvals complete.
+
 Merge policy:
 
-- minimum reviewers: 1
+- approving review count: governed by [`.github/governance.toml`](/Users/justinshort/short%20origin/.github/governance.toml)
 - squash merge: required
 - direct pushes to `main`: prohibited
 - dismiss stale approvals when new commits are pushed
-- code owner review: required
+- code owner review requirement: governed by [`.github/governance.toml`](/Users/justinshort/short%20origin/.github/governance.toml)
 - auto-merge: enabled as the fallback path when merge queue is unavailable
+
+PRs must not merge while any required check is missing, skipped unexpectedly, or failing due to undocumented incident conditions.
 
 ## CI/CD Baseline
 
@@ -108,6 +126,12 @@ Required status checks:
 - `CI / pr-gate`
 - `Security / security-gate`
 
+Workflow ownership conventions:
+
+- Third-party workflow helpers that require custom allow-listing should be mirrored under `.github/actions/` or replaced with repository-owned logic.
+- Workflow changes must remain auditable, deterministic, and pinned to explicit tool versions.
+- Changes to delivery or release workflows require corresponding documentation updates in `docs/process/`.
+
 ## Release Promotion
 
 - `main` remains continuously mergeable after required checks pass.
@@ -119,6 +143,13 @@ Required status checks:
   `production`, and creates the final GitHub Release without rebuilding.
 - Rollback is manifest-based: redeploy the prior release manifest and OCI digests rather than
   rebuilding.
+
+Release procedure expectations:
+
+1. Cut release candidates only from a green `main` SHA.
+2. Treat rendered manifests and OCI digests as the deployable release record.
+3. Use GitHub environments for approval boundaries; do not bypass them with manual cloud changes.
+4. Record rollback guidance and notable operational changes in the PR or release notes.
 
 ## Review Standards
 
@@ -156,3 +187,5 @@ Every repository in the organization should include:
 - `DEVELOPMENT_MODEL.md`
 
 Organization rollout details and bootstrap commands live in [docs/process/github-governance-rollout.md](/Users/justinshort/short%20origin/docs/process/github-governance-rollout.md).
+
+Contributor procedure details live in [CONTRIBUTING.md](/Users/justinshort/short%20origin/CONTRIBUTING.md), and repository-specific operating constraints live in [AGENTS.md](/Users/justinshort/short%20origin/AGENTS.md).

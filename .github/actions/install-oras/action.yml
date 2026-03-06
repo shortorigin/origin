@@ -1,0 +1,36 @@
+name: Install ORAS
+description: Install a pinned ORAS CLI release with checksum verification.
+
+inputs:
+  version:
+    description: ORAS CLI version.
+    required: false
+    default: "1.3.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Install ORAS from pinned release
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        version="${{ inputs.version }}"
+        if [[ "${version}" != "1.3.0" ]]; then
+          echo "Unsupported ORAS version ${version}. Update the local action checksum before changing versions."
+          exit 1
+        fi
+
+        archive="oras_${version}_linux_amd64.tar.gz"
+        url="https://github.com/oras-project/oras/releases/download/v${version}/${archive}"
+        checksum="6cdc692f929100feb08aa8de584d02f7bcc30ec7d88bc2adc2054d782db57c64"
+        install_dir="${RUNNER_TEMP}/short-origin-oras/${version}"
+
+        mkdir -p "${install_dir}"
+        curl --fail --silent --show-error --location "${url}" --output "${install_dir}/${archive}"
+        echo "${checksum}  ${install_dir}/${archive}" | sha256sum --check --status
+
+        tar -xzf "${install_dir}/${archive}" -C "${install_dir}" oras
+        chmod 0755 "${install_dir}/oras"
+        echo "${install_dir}" >> "${GITHUB_PATH}"
+        "${install_dir}/oras" version

@@ -1,0 +1,64 @@
+name: Install Rust
+description: Install a pinned Rust toolchain using rustup under repository control.
+
+inputs:
+  toolchain:
+    description: Rust toolchain channel or version.
+    required: false
+    default: stable
+  components:
+    description: Comma-separated rustup components to install.
+    required: false
+    default: ""
+  targets:
+    description: Comma-separated rustup targets to install.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install requested Rust toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        toolchain="${{ inputs.toolchain }}"
+        components="${{ inputs.components }}"
+        targets="${{ inputs.targets }}"
+
+        rustup toolchain install "${toolchain}" --profile minimal --no-self-update
+        rustup default "${toolchain}"
+
+        if [[ -n "${components}" ]]; then
+          IFS=',' read -r -a raw_components <<< "${components}"
+          install_components=()
+          for component in "${raw_components[@]}"; do
+            component="${component// /}"
+            if [[ -n "${component}" ]]; then
+              install_components+=("${component}")
+            fi
+          done
+
+          if [[ "${#install_components[@]}" -gt 0 ]]; then
+            rustup component add --toolchain "${toolchain}" "${install_components[@]}"
+          fi
+        fi
+
+        if [[ -n "${targets}" ]]; then
+          IFS=',' read -r -a raw_targets <<< "${targets}"
+          install_targets=()
+          for target in "${raw_targets[@]}"; do
+            target="${target// /}"
+            if [[ -n "${target}" ]]; then
+              install_targets+=("${target}")
+            fi
+          done
+
+          if [[ "${#install_targets[@]}" -gt 0 ]]; then
+            rustup target add --toolchain "${toolchain}" "${install_targets[@]}"
+          fi
+        fi
+
+        rustc --version
+        cargo --version

@@ -1,0 +1,101 @@
+name: Configure AWS OIDC Credentials
+description: Assume an AWS role from GitHub OIDC without relying on a third-party action.
+
+inputs:
+  aws-region:
+    description: AWS region for CLI defaults.
+    required: true
+  role-to-assume:
+    description: AWS IAM role ARN to assume via OIDC.
+    required: true
+  role-session-name:
+    description: AWS STS role session name.
+    required: false
+    default: short-origin-github-actions
+  role-duration-seconds:
+    description: AWS STS session duration in seconds.
+    required: false
+    default: "3600"
+
+outputs:
+  aws-account-id:
+    description: AWS account ID returned by STS.
+    value: ${{ steps.assume-role.outputs.aws-account-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: assume-role
+      name: Request GitHub OIDC token and assume AWS role
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v aws >/dev/null 2>&1; then
+          echo "aws CLI is required on the runner."
+          exit 1
+        fi
+
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "jq is required on the runner."
+          exit 1
+        fi
+
+        if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+          echo "GitHub OIDC environment is unavailable. Ensure id-token: write is granted."
+          exit 1
+        fi
+
+        request_url="${ACTIONS_ID_TOKEN_REQUEST_URL}"
+        separator='&'
+        if [[ "${request_url}" != *\?* ]]; then
+          separator='?'
+        fi
+        request_url="${request_url}${separator}audience=sts.amazonaws.com"
+
+        token_json="$(
+          curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${request_url}"
+        )"
+        web_identity_token="$(jq -r '.value' <<< "${token_json}")"
+        if [[ -z "${web_identity_token}" || "${web_identity_token}" == "null" ]]; then
+          echo "Failed to obtain GitHub OIDC token."
+          exit 1
+        fi
+
+        assume_role_json="$(
+          aws sts assume-role-with-web-identity \
+            --role-arn "${{ inputs.role-to-assume }}" \
+            --role-session-name "${{ inputs.role-session-name }}" \
+            --web-identity-token "${web_identity_token}" \
+            --duration-seconds "${{ inputs.role-duration-seconds }}" \
+            --region "${{ inputs.aws-region }}" \
+            --output json
+        )"
+
+        access_key_id="$(jq -r '.Credentials.AccessKeyId' <<< "${assume_role_json}")"
+        secret_access_key="$(jq -r '.Credentials.SecretAccessKey' <<< "${assume_role_json}")"
+        session_token="$(jq -r '.Credentials.SessionToken' <<< "${assume_role_json}")"
+        account_id="$(jq -r '.AssumedRoleUser.Arn' <<< "${assume_role_json}" | cut -d: -f5)"
+
+        if [[ -z "${access_key_id}" || "${access_key_id}" == "null" ]]; then
+          echo "AWS STS returned empty credentials."
+          exit 1
+        fi
+
+        {
+          echo "::add-mask::${access_key_id}"
+          echo "::add-mask::${secret_access_key}"
+          echo "::add-mask::${session_token}"
+        } >&2
+
+        {
+          echo "AWS_ACCESS_KEY_ID=${access_key_id}"
+          echo "AWS_SECRET_ACCESS_KEY=${secret_access_key}"
+          echo "AWS_SESSION_TOKEN=${session_token}"
+          echo "AWS_REGION=${{ inputs.aws-region }}"
+          echo "AWS_DEFAULT_REGION=${{ inputs.aws-region }}"
+        } >> "${GITHUB_ENV}"
+
+        echo "aws-account-id=${account_id}" >> "${GITHUB_OUTPUT}"
