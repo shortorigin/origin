@@ -1,9 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use finance_service::component::component_binding_with_artifact as finance_component_binding;
-use lattice_config::{LatticeConfigV1, RolloutTargetV1};
-use treasury_disbursement::component::component_binding_with_artifact as treasury_component_binding;
+use lattice_config::{
+    finance_service_component_binding_with_artifact, rollout_target_for_environment,
+    treasury_disbursement_component_binding_with_artifact, LatticeConfigV1,
+};
 
 const DEFAULT_REGISTRY: &str = "ghcr.io/shortorigin";
 const PENDING_DIGEST: &str = "sha256:pending";
@@ -71,7 +72,7 @@ fn render_components(args: &[String]) -> Result<(), String> {
 
     write_json(
         &output_dir.join("finance-service.json"),
-        &finance_component_binding(
+        &finance_service_component_binding_with_artifact(
             format!("{registry}/finance-service:{tag}"),
             PENDING_DIGEST,
             environment,
@@ -79,7 +80,7 @@ fn render_components(args: &[String]) -> Result<(), String> {
     )?;
     write_json(
         &output_dir.join("treasury-disbursement.json"),
-        &treasury_component_binding(
+        &treasury_disbursement_component_binding_with_artifact(
             format!("{registry}/treasury-disbursement:{tag}"),
             PENDING_DIGEST,
             environment,
@@ -149,14 +150,14 @@ fn render_manifest(args: &[String]) -> Result<(), String> {
     let output = output.ok_or_else(|| "missing --output".to_owned())?;
     let manifest = LatticeConfigV1 {
         lattice_name: LATTICE_NAME.to_string(),
-        rollout: rollout_target(environment),
+        rollout: rollout_target_for_environment(environment),
         components: vec![
-            finance_component_binding(
+            finance_service_component_binding_with_artifact(
                 finance_ref.ok_or_else(|| "missing --finance-ref".to_owned())?,
                 finance_digest.ok_or_else(|| "missing --finance-digest".to_owned())?,
                 environment,
             ),
-            treasury_component_binding(
+            treasury_disbursement_component_binding_with_artifact(
                 treasury_ref.ok_or_else(|| "missing --treasury-ref".to_owned())?,
                 treasury_digest.ok_or_else(|| "missing --treasury-digest".to_owned())?,
                 environment,
@@ -177,14 +178,6 @@ fn parse_environment(value: &str) -> Result<&str, String> {
 
 fn normalize_registry(value: &str) -> String {
     value.trim_end_matches('/').to_string()
-}
-
-fn rollout_target(environment: &str) -> RolloutTargetV1 {
-    RolloutTargetV1 {
-        environment: environment.to_string(),
-        namespace: environment.to_string(),
-        policy_group: format!("short-origin-{environment}"),
-    }
 }
 
 fn write_json(path: &Path, value: &impl serde::Serialize) -> Result<(), String> {
@@ -208,7 +201,8 @@ fn help() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_registry, parse_environment, rollout_target};
+    use super::{normalize_registry, parse_environment};
+    use lattice_config::rollout_target_for_environment;
 
     #[test]
     fn parse_environment_accepts_all_delivery_targets() {
@@ -227,7 +221,7 @@ mod tests {
 
     #[test]
     fn rollout_target_tracks_environment_name() {
-        let target = rollout_target("stage");
+        let target = rollout_target_for_environment("stage");
         assert_eq!(target.environment, "stage");
         assert_eq!(target.namespace, "stage");
         assert_eq!(target.policy_group, "short-origin-stage");

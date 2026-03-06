@@ -102,6 +102,17 @@ cargo test --workspace --all-targets
 cargo audit
 ```
 
+CI optimization policy:
+
+- Rust validation is path-scoped:
+  backend-only Rust changes run the core validation profile, UI-only changes run the UI validation profile, and shared/root changes run the full workspace validation plus browser preview build.
+- GitHub Actions reuses shared Rust dependency caches across CI, delivery, release, and security workflows with stable shared cache keys.
+- Small cargo-installed tools are cached explicitly:
+  `trunk` is cached for UI/browser preview builds and `cargo-audit` is cached for the security workflow.
+- CI keeps incremental compilation disabled so cache storage is spent on reusable dependency artifacts instead of large incremental state that churns quickly on hosted runners.
+- `sccache` and `target/` artifact reuse were evaluated but are not enabled in the current baseline:
+  the workspace artifact footprint is too large for GitHub's cache budget to make those approaches efficient without an external cache backend.
+
 Required status checks:
 
 - `Governance / validate`

@@ -6,12 +6,10 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
-finance-service = { path = "../services/finance-service" }
 lattice-config = { path = "../platform/wasmcloud/lattice-config" }
 regex = "1.12.2"
 serde.workspace = true
 serde_json.workspace = true
-treasury-disbursement = { path = "../workflows/treasury_disbursement" }
 toml.workspace = true
 
 [lints]

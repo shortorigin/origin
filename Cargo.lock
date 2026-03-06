@@ -2272,7 +2272,6 @@ dependencies = [
  "contracts",
  "enforcement",
  "error-model",
- "wasmcloud-bindings",
 ]
 
 [[package]]
@@ -8573,7 +8572,6 @@ dependencies = [
  "orchestrator",
  "policy-sdk",
  "policy-service",
- "wasmcloud-bindings",
 ]
 
 [[package]]
@@ -10240,13 +10238,11 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
- "finance-service",
  "lattice-config",
  "regex",
  "serde",
  "serde_json",
  "toml 0.8.23",
- "treasury-disbursement",
 ]
 
 [[package]]

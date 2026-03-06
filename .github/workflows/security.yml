@@ -28,6 +28,8 @@ jobs:
 
   cargo-audit:
     runs-on: ubuntu-latest
+    env:
+      CARGO_AUDIT_VERSION: 0.22.1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +39,22 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-core-ubuntu-stable-v1
+          cache-all-crates: "false"
+          cache-bin: "false"
+          cache-workspace-crates: "false"
+
+      - name: Cache cargo-audit
+        id: cargo-audit-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-${{ env.CARGO_AUDIT_VERSION }}
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked --version "${CARGO_AUDIT_VERSION}"
 
       - name: Run cargo audit
         run: cargo audit
@@ -72,6 +87,15 @@ jobs:
       - name: Install Rust toolchain
         if: matrix.language == 'rust'
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-ui-ubuntu-stable-v1
+          cache-all-crates: "false"
+          cache-bin: "false"
+          cache-workspace-crates: "false"
 
       - name: Install Rust UI dependencies
         if: matrix.language == 'rust'

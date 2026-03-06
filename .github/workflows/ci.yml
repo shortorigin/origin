@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ steps.detect.outputs.rust }}
+      rust_core: ${{ steps.detect.outputs.rust_core }}
+      rust_ui: ${{ steps.detect.outputs.rust_ui }}
       nomad: ${{ steps.detect.outputs.nomad }}
       pulumi: ${{ steps.detect.outputs.pulumi }}
       nomad_files: ${{ steps.detect.outputs.nomad_files }}
@@ -33,6 +35,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
+    env:
+      TRUNK_VERSION: 0.21.14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,12 +45,31 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
 
-      - name: Cache cargo
+      - name: Cache cargo for core validation
         uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.rust_ui != 'true'
+        with:
+          shared-key: rust-core-ubuntu-stable-v1
+          cache-all-crates: "false"
+          cache-bin: "false"
+          cache-workspace-crates: "false"
+
+      - name: Cache cargo for UI validation
+        uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.rust_ui == 'true'
+        with:
+          shared-key: rust-ui-ubuntu-stable-v1
+          cache-all-crates: "false"
+          cache-bin: "false"
+          cache-workspace-crates: "false"
+
+      - name: Install wasm target
+        if: needs.changes.outputs.rust_ui == 'true'
+        run: rustup target add wasm32-unknown-unknown
 
       - name: Install UI and desktop build dependencies
+        if: needs.changes.outputs.rust_ui == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -57,29 +80,31 @@ jobs:
             patchelf \
             libxdo-dev
 
+      - name: Cache Trunk
+        id: trunk-cache
+        if: needs.changes.outputs.rust_ui == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/trunk
+          key: ${{ runner.os }}-trunk-${{ env.TRUNK_VERSION }}
+
       - name: Install Trunk
-        run: cargo install trunk --locked
+        if: needs.changes.outputs.rust_ui == 'true' && steps.trunk-cache.outputs.cache-hit != 'true'
+        run: cargo install trunk --locked --version "${TRUNK_VERSION}"
 
-      - name: cargo fmt
-        run: cargo fmt --all --check
-
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace --all-targets
-
-      - name: Component build and parity checks
-        run: cargo components-build
-
-      - name: WIT and repository smoke tests
-        run: cargo test -p wasmcloud-bindings -p wasmcloud-smoke-tests -p surrealdb-access
-
-      - name: Browser preview build
-        run: cargo xtask ui build --features desktop-tauri --dist target/trunk-ci-dist
-
-      - name: Tauri check
-        run: cargo check -p desktop_tauri --all-features
+      - name: Run workspace validation profile
+        run: |
+          if [[ "${{ needs.changes.outputs.rust_core }}" == "true" && "${{ needs.changes.outputs.rust_ui }}" == "false" ]]; then
+            cargo xtask verify profile core
+          elif [[ "${{ needs.changes.outputs.rust_core }}" == "false" && "${{ needs.changes.outputs.rust_ui }}" == "true" ]]; then
+            cargo xtask verify profile ui-ci
+          elif [[ "${{ needs.changes.outputs.rust_core }}" == "true" && "${{ needs.changes.outputs.rust_ui }}" == "true" ]]; then
+            cargo xtask verify profile full
+            cargo xtask ui build --features desktop-tauri --dist target/trunk-ci-dist
+          else
+            echo "Unsupported Rust change scope combination"
+            exit 1
+          fi
 
       - name: Infrastructure posture validation
         run: |

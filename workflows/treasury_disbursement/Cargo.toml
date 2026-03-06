@@ -15,7 +15,6 @@ policy-sdk = { path = "../../shared/policy-sdk" }
 policy-service = { path = "../../services/policy-service" }
 enforcement = { path = "../../platform/runtime/enforcement" }
 error-model = { path = "../../shared/error-model" }
-wasmcloud-bindings = { path = "../../platform/wasmcloud/bindings" }
 
 [dev-dependencies]
 chrono.workspace = true

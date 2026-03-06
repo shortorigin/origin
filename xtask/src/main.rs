@@ -5,6 +5,22 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+const UI_PACKAGES: &[&str] = &[
+    "desktop_app_contract",
+    "desktop_runtime",
+    "desktop_tauri",
+    "platform_host",
+    "platform_host_web",
+    "site",
+    "system_ui",
+    "system_shell",
+    "system_shell_contract",
+    "shrs_core_headless",
+    "desktop_app_control_center",
+    "desktop_app_settings",
+    "desktop_app_terminal",
+];
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -94,35 +110,50 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
     let profile = match args.as_slice() {
         [profile] => profile.as_str(),
         [first, profile] if first == "profile" => profile.as_str(),
-        _ => return Err("expected `verify profile <fast|ui|full>`".to_string()),
+        _ => return Err("expected `verify profile <core|fast|ui|ui-ci|full>`".to_string()),
     };
 
     let workspace_root = workspace_root()?;
     match profile {
-        "fast" => {
+        "core" | "fast" => {
             cargo(&workspace_root, &["fmt", "--all", "--check"])?;
-            cargo(&workspace_root, &["check", "--workspace", "--all-targets"])?;
+            cargo(
+                &workspace_root,
+                &workspace_command_with_excludes(
+                    &["clippy", "--workspace", "--all-targets", "--all-features"],
+                    UI_PACKAGES,
+                    &["--", "-D", "warnings"],
+                ),
+            )?;
+            cargo(
+                &workspace_root,
+                &workspace_command_with_excludes(
+                    &["test", "--workspace", "--all-targets"],
+                    UI_PACKAGES,
+                    &[],
+                ),
+            )?;
         }
-        "ui" => {
+        "ui" | "ui-ci" => {
             cargo(
                 &workspace_root,
-                &[
-                    "check",
-                    "-p",
-                    "desktop_app_contract",
-                    "-p",
-                    "desktop_app_control_center",
-                    "-p",
-                    "desktop_runtime",
-                    "-p",
-                    "site",
-                    "--all-features",
-                ],
+                &package_command_with_packages(
+                    &["clippy", "--all-targets", "--all-features"],
+                    UI_PACKAGES,
+                    &["--", "-D", "warnings"],
+                ),
             )?;
             cargo(
                 &workspace_root,
-                &["check", "-p", "desktop_tauri", "--all-features"],
+                &package_command_with_packages(&["test", "--all-targets"], UI_PACKAGES, &[]),
             )?;
+            run_ui(vec![
+                "build".to_string(),
+                "--features".to_string(),
+                "desktop-tauri".to_string(),
+                "--dist".to_string(),
+                "target/trunk-ci-dist".to_string(),
+            ])?;
         }
         "full" => {
             cargo(&workspace_root, &["fmt", "--all", "--check"])?;
@@ -139,23 +170,41 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
                 ],
             )?;
             cargo(&workspace_root, &["test", "--workspace", "--all-targets"])?;
-            cargo(
-                &workspace_root,
-                &[
-                    "test",
-                    "-p",
-                    "wasmcloud-bindings",
-                    "-p",
-                    "wasmcloud-smoke-tests",
-                    "-p",
-                    "surrealdb-access",
-                ],
-            )?;
         }
         other => return Err(format!("unknown verification profile `{other}`")),
     }
 
     Ok(())
+}
+
+fn workspace_command_with_excludes(
+    prefix: &[&'static str],
+    excluded_packages: &[&'static str],
+    suffix: &[&'static str],
+) -> Vec<&'static str> {
+    let mut args = Vec::with_capacity(prefix.len() + excluded_packages.len() * 2 + suffix.len());
+    args.extend_from_slice(prefix);
+    for package in excluded_packages {
+        args.push("--exclude");
+        args.push(package);
+    }
+    args.extend_from_slice(suffix);
+    args
+}
+
+fn package_command_with_packages(
+    prefix: &[&'static str],
+    packages: &[&'static str],
+    suffix: &[&'static str],
+) -> Vec<&'static str> {
+    let mut args = Vec::with_capacity(prefix.len() + packages.len() * 2 + suffix.len());
+    args.extend_from_slice(prefix);
+    for package in packages {
+        args.push("-p");
+        args.push(package);
+    }
+    args.extend_from_slice(suffix);
+    args
 }
 
 fn cargo(workspace_root: &Path, args: &[&str]) -> Result<(), String> {
