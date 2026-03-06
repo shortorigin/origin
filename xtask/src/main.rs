@@ -50,6 +50,7 @@ fn run() -> Result<(), String> {
     match args.next().as_deref() {
         Some("github") => github::run(args.collect()),
         Some("delivery") => delivery::run(args.collect()),
+        Some("wasmcloud") => run_wasmcloud(args.collect()),
         Some("ui") => run_ui(args.collect()),
         Some("tauri") => run_tauri(args.collect()),
         Some("components") => run_components(args.collect()),
@@ -124,6 +125,27 @@ fn run_components(args: Vec<String>) -> Result<(), String> {
     run_command(&mut command)
 }
 
+fn run_wasmcloud(args: Vec<String>) -> Result<(), String> {
+    let (subcommand, passthrough) = args
+        .split_first()
+        .ok_or_else(|| "expected `wasmcloud <doctor|up|down|status|manifest>`".to_string())?;
+    let workspace_root = workspace_root()?;
+
+    match subcommand.as_str() {
+        "doctor" => run_wasmcloud_doctor(&workspace_root),
+        "up" => run_wash(&workspace_root, "up", passthrough, true),
+        "down" => run_wash(&workspace_root, "down", passthrough, false),
+        "status" => run_wash(
+            &workspace_root,
+            "get",
+            &prepend_get_hosts(passthrough),
+            false,
+        ),
+        "manifest" => run_wasmcloud_manifest(&workspace_root, passthrough),
+        other => Err(format!("unsupported wasmcloud subcommand `{other}`")),
+    }
+}
+
 fn run_verify(args: Vec<String>) -> Result<(), String> {
     let profile = match args.as_slice() {
         [profile] => profile.as_str(),
@@ -193,6 +215,103 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn run_wasmcloud_doctor(workspace_root: &Path) -> Result<(), String> {
+    ensure_command_available("rustc", &["--version"])?;
+    ensure_command_available("cargo", &["--version"])?;
+    ensure_command_available("rustup", &["target", "list", "--installed"])?;
+    ensure_command_available("wash", &["--version"])?;
+    ensure_command_available("docker", &["--version"])?;
+    ensure_any_rust_target_installed(&[
+        "wasm32-wasip1",
+        "wasm32-wasip2",
+        "wasm32-unknown-unknown",
+    ])?;
+
+    cargo(workspace_root, &["xtask", "components", "build"])?;
+    cargo(
+        workspace_root,
+        &["test", "-p", "wasmcloud-smoke-tests", "--all-targets"],
+    )?;
+
+    Ok(())
+}
+
+fn run_wasmcloud_manifest(workspace_root: &Path, args: &[String]) -> Result<(), String> {
+    let mut command = Command::new("cargo");
+    command.current_dir(workspace_root);
+    command.args(["xtask", "delivery", "render-manifest"]);
+    command.args(args);
+    run_command(&mut command)
+}
+
+fn prepend_get_hosts(args: &[String]) -> Vec<String> {
+    let mut command_args = Vec::with_capacity(args.len() + 1);
+    command_args.push("hosts".to_string());
+    command_args.extend(args.iter().cloned());
+    command_args
+}
+
+fn run_wash(
+    workspace_root: &Path,
+    subcommand: &str,
+    passthrough: &[String],
+    include_default_lattice: bool,
+) -> Result<(), String> {
+    ensure_command_available("wash", &["--version"])?;
+
+    let mut command = Command::new("wash");
+    command.current_dir(workspace_root);
+    command.arg(subcommand);
+    if include_default_lattice && !args_include_lattice(passthrough) {
+        command.arg("--lattice");
+        command.arg("institutional-lattice");
+    }
+    command.args(passthrough);
+    run_command(&mut command)
+}
+
+fn args_include_lattice(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--lattice" || arg.starts_with("--lattice=") || arg == "-x")
+}
+
+fn ensure_command_available(program: &str, args: &[&str]) -> Result<(), String> {
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|error| format!("required command `{program}` is unavailable: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "required command `{program}` failed its readiness check"
+        ))
+    }
+}
+
+fn ensure_any_rust_target_installed(targets: &[&str]) -> Result<(), String> {
+    let output = Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .map_err(|error| format!("failed to inspect installed Rust targets: {error}"))?;
+    if !output.status.success() {
+        return Err("`rustup target list --installed` failed".to_string());
+    }
+
+    let installed = String::from_utf8_lossy(&output.stdout);
+    if targets
+        .iter()
+        .any(|target| installed.lines().any(|line| line.trim() == *target))
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "no supported Rust wasm target is installed; install one of: {}",
+            targets.join(", ")
+        ))
+    }
 }
 
 fn workspace_command_with_excludes(
@@ -309,12 +428,15 @@ fn workspace_root() -> Result<PathBuf, String> {
 }
 
 fn help() -> String {
-    "usage: cargo xtask <delivery|github|ui|tauri|components|verify> ...".to_string()
+    "usage: cargo xtask <delivery|github|wasmcloud|ui|tauri|components|verify> ...".to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{drop_no_open_arg, normalize_dist_arg, sanitize_trunk_environment};
+    use super::{
+        args_include_lattice, drop_no_open_arg, normalize_dist_arg, prepend_get_hosts,
+        sanitize_trunk_environment,
+    };
     use std::path::Path;
     use std::process::Command;
 
@@ -364,5 +486,20 @@ mod tests {
         } else {
             std::env::remove_var("NO_COLOR");
         }
+    }
+
+    #[test]
+    fn prepend_get_hosts_adds_hosts_subcommand() {
+        let args =
+            prepend_get_hosts(&["--lattice".to_string(), "institutional-lattice".to_string()]);
+        assert_eq!(args, ["hosts", "--lattice", "institutional-lattice"]);
+    }
+
+    #[test]
+    fn args_include_lattice_detects_short_and_long_flags() {
+        assert!(args_include_lattice(&["--lattice".to_string()]));
+        assert!(args_include_lattice(&["--lattice=dev".to_string()]));
+        assert!(args_include_lattice(&["-x".to_string()]));
+        assert!(!args_include_lattice(&["--detached".to_string()]));
     }
 }

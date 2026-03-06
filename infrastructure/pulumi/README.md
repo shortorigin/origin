@@ -30,11 +30,11 @@ This workspace provides a modular Pulumi TypeScript codebase for provisioning AW
 ```bash
 cd live
 pulumi stack select dev
-pulumi config set --secret short-origin:tunnelSecret "<BASE64_32_BYTE_SECRET>"
-pulumi config set --secret short-origin:surrealdbRootPassword "<PASSWORD>"
+pulumi config set --secret origin:tunnelSecret "<BASE64_32_BYTE_SECRET>"
+pulumi config set --secret origin:surrealdbRootPassword "<PASSWORD>"
 pulumi stack select stage
-pulumi config set --secret short-origin:tunnelSecret "<BASE64_32_BYTE_SECRET>"
-pulumi config set --secret short-origin:surrealdbRootPassword "<PASSWORD>"
+pulumi config set --secret origin:tunnelSecret "<BASE64_32_BYTE_SECRET>"
+pulumi config set --secret origin:surrealdbRootPassword "<PASSWORD>"
 ```
 
 3. Preview and deploy:

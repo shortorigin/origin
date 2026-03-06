@@ -13,7 +13,7 @@ tags="$3"
 output="$(
   oras push \
     --artifact-type application/vnd.shortorigin.component.v1+json \
-    --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-shortorigin/short-origin}" \
+    --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-shortorigin/origin}" \
     --annotation "org.opencontainers.image.revision=${GITHUB_SHA:-unknown}" \
     --format json \
     "${repository}:${tags}" \

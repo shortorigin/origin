@@ -10,7 +10,7 @@ pub(super) fn mount_calculator_placeholder_app(context: AppMountContext) -> View
     compatibility_placeholder(
         context,
         "Calculator",
-        "The calculator sample app is not part of the Short Origin shell. Use Control Center for institutional workspace status instead.",
+        "The calculator sample app is not part of the Origin shell. Use Control Center for institutional workspace status instead.",
     )
 }
 

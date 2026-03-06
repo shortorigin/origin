@@ -15,14 +15,14 @@ Dry-run the organization and repository sync plans:
 
 ```bash
 cargo xtask github sync org --config .github/governance.toml --dry-run
-cargo xtask github sync repo --config .github/governance.toml --repository shortorigin/short-origin --dry-run
+cargo xtask github sync repo --config .github/governance.toml --repository shortorigin/origin --dry-run
 ```
 
 Apply the GitHub settings with `gh` once authenticated:
 
 ```bash
 cargo xtask github sync org --config .github/governance.toml --apply
-cargo xtask github sync repo --config .github/governance.toml --repository shortorigin/short-origin --apply
+cargo xtask github sync repo --config .github/governance.toml --repository shortorigin/origin --apply
 ```
 
 ## Organization Setup

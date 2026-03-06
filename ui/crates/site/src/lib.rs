@@ -1,4 +1,4 @@
-//! Web entrypoints for the Short Origin OS shell site.
+//! Web entrypoints for the Origin OS shell site.
 //!
 //! This crate exposes the root Leptos components and the browser mount helper used by the
 //! `site_app` binary.

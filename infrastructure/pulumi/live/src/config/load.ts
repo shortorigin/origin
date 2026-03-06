@@ -9,7 +9,7 @@ export interface LoadedInfra {
 
 export function loadConfig(): LoadedInfra {
   const awsConfig = new pulumi.Config("aws");
-  const config = new pulumi.Config("short-origin");
+  const config = new pulumi.Config("origin");
 
   const parsed = validateInfraConfig({
     projectName: pulumi.getProject(),

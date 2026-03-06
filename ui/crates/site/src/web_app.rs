@@ -31,10 +31,10 @@ pub fn SiteApp() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <Title text="Short Origin OS" />
+        <Title text="Origin OS" />
         <Meta
             name="description"
-            content="Short Origin OS is a Leptos shell for wasmCloud-managed platform operations."
+            content="Origin OS is a Leptos shell for wasmCloud-managed platform operations."
         />
         <style id="desktop-theme-css">{DESKTOP_THEME_CSS}</style>
 

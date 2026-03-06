@@ -11,7 +11,7 @@ export interface ObservabilityArgs {
 
 export function createObservability(args: ObservabilityArgs): void {
   new aws.cloudwatch.LogGroup(stackResourceName(args.config, "system-log-group"), {
-    name: `/short-origin/${args.config.env}/system`,
+    name: `/origin/${args.config.env}/system`,
     retentionInDays: 30,
     tags: args.tags,
   });

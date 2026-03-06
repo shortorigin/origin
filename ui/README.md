@@ -1,7 +1,7 @@
 # UI
 
 ## Purpose
-`ui/` owns the Short Origin OS shell built with Leptos and distributed through Tauri. It is the only top-level module allowed to define UI-specific models, host composition, and desktop/web presentation behavior.
+`ui/` owns the Origin OS shell built with Leptos and distributed through Tauri. It is the only top-level module allowed to define UI-specific models, host composition, and desktop/web presentation behavior.
 
 ## Scope
 In scope:

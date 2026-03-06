@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Short Origin OS",
+  "productName": "Origin OS",
   "version": "0.1.0",
-  "identifier": "com.shortorigin.os.desktop",
+  "identifier": "com.origin.os.desktop",
   "build": {
     "beforeDevCommand": "cargo xtask ui dev --features desktop-tauri --dist target/trunk-tauri-dev --port 1420 --no-open",
     "beforeBuildCommand": "cargo xtask ui build --release --features desktop-tauri --dist target/trunk-tauri-dist",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Short Origin OS",
+        "title": "Origin OS",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
