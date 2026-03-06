@@ -44,6 +44,12 @@
 - Model recoverable failures with `Result` and domain-specific error enums.
 - Keep unsafe code disallowed unless documented with justification and tests.
 
+## Branding and Provenance Hygiene
+- Repository artifacts MUST NOT include Codex, OpenAI, ChatGPT, or other assistant/vendor branding in source code, generated assets, UI copy, comments, docs, tests, fixtures, commit messages, PR text, or issue text unless the material is an intentional third-party reference, legal attribution, or external integration note.
+- When AI tools assist with implementation, contributors must rewrite outputs so they reflect repository terminology and product language rather than tool branding.
+- Placeholder text, scaffolding comments, and generated boilerplate MUST be normalized before merge.
+- Reviewers should treat leaked assistant/vendor branding as a documentation and quality defect that blocks merge until removed or justified.
+
 ## Build, Lint, and Test Standards
 - Required pre-merge quality gates from repository root:
 ```bash
@@ -100,3 +106,4 @@ cargo test --workspace --all-targets
   - verification status.
 - Agents may propose changes outside their domain but may not execute boundary-crossing mutations without policy/workflow authorization.
 - When requirements conflict, agents prioritize contract correctness, policy compliance, and test pass criteria in that order.
+- Agents MUST NOT introduce Codex, OpenAI, ChatGPT, or similar branding into repository artifacts unless explicitly required for a documented third-party reference or legal attribution.
