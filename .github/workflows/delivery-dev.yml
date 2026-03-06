@@ -25,12 +25,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node
+        uses: actions/setup-node@v4
         with:
+          node-version: "20"
+          cache: npm
           cache-dependency-path: infrastructure/pulumi/package-lock.json
 
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
       - name: Setup ORAS
         uses: oras-project/setup-oras@v1

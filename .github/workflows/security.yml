@@ -32,17 +32,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          cargo-bins: |
-            cargo-audit
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Doctor security toolchain
-        run: cargo xtask doctor --domain security --ci
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
 
       - name: Run cargo audit
-        run: cargo xtask run security-audit
+        run: cargo audit
 
   codeql:
     runs-on: ubuntu-latest
@@ -69,15 +69,21 @@ jobs:
           queries: security-and-quality
           build-mode: ${{ matrix.build-mode }}
 
-      - name: Setup Rust
+      - name: Install Rust toolchain
         if: matrix.language == 'rust'
-        uses: ./.github/actions/setup-rust
-        with:
-          install-sccache: "false"
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Linux UI packages
+      - name: Install Rust UI dependencies
         if: matrix.language == 'rust'
-        uses: ./.github/actions/setup-linux-ui
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev
 
       - name: Build Rust workspace for CodeQL
         if: matrix.language == 'rust'
