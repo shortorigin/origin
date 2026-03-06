@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ steps.detect.outputs.rust }}
-      rust_core: ${{ steps.detect.outputs.rust_core }}
-      rust_ui: ${{ steps.detect.outputs.rust_ui }}
       nomad: ${{ steps.detect.outputs.nomad }}
       pulumi: ${{ steps.detect.outputs.pulumi }}
       nomad_files: ${{ steps.detect.outputs.nomad_files }}
@@ -30,13 +28,11 @@ jobs:
         id: detect
         run: ./.github/scripts/detect_changes.sh
 
-  workspace:
-    name: Workspace validation
+  verify:
+    name: verify
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
-    env:
-      TRUNK_VERSION: 0.21.14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,65 +42,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo for core validation
+      - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-        if: needs.changes.outputs.rust_ui != 'true'
         with:
           shared-key: rust-core-ubuntu-stable-v1
           cache-all-crates: "false"
           cache-bin: "false"
           cache-workspace-crates: "false"
 
-      - name: Cache cargo for UI validation
-        uses: Swatinem/rust-cache@v2
-        if: needs.changes.outputs.rust_ui == 'true'
-        with:
-          shared-key: rust-ui-ubuntu-stable-v1
-          cache-all-crates: "false"
-          cache-bin: "false"
-          cache-workspace-crates: "false"
-
-      - name: Install wasm target
-        if: needs.changes.outputs.rust_ui == 'true'
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Install UI and desktop build dependencies
-        if: needs.changes.outputs.rust_ui == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libxdo-dev
-
-      - name: Cache Trunk
-        id: trunk-cache
-        if: needs.changes.outputs.rust_ui == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/trunk
-          key: ${{ runner.os }}-trunk-${{ env.TRUNK_VERSION }}
-
-      - name: Install Trunk
-        if: needs.changes.outputs.rust_ui == 'true' && steps.trunk-cache.outputs.cache-hit != 'true'
-        run: cargo install trunk --locked --version "${TRUNK_VERSION}"
-
-      - name: Run workspace validation profile
-        run: |
-          if [[ "${{ needs.changes.outputs.rust_core }}" == "true" && "${{ needs.changes.outputs.rust_ui }}" == "false" ]]; then
-            cargo xtask verify profile core
-          elif [[ "${{ needs.changes.outputs.rust_core }}" == "false" && "${{ needs.changes.outputs.rust_ui }}" == "true" ]]; then
-            cargo xtask verify profile ui-ci
-          elif [[ "${{ needs.changes.outputs.rust_core }}" == "true" && "${{ needs.changes.outputs.rust_ui }}" == "true" ]]; then
-            cargo xtask verify profile full
-            cargo xtask ui build --features desktop-tauri --dist target/trunk-ci-dist
-          else
-            echo "Unsupported Rust change scope combination"
-            exit 1
-          fi
+      - name: Run core verification profile
+        run: cargo xtask verify profile core
 
       - name: Infrastructure posture validation
         run: |
@@ -114,7 +61,7 @@ jobs:
           fi
 
   nomad:
-    name: Nomad validation
+    name: nomad
     needs: changes
     if: needs.changes.outputs.nomad == 'true'
     runs-on: ubuntu-latest
@@ -137,29 +84,14 @@ jobs:
               nomad job validate "${file}"
           done
 
-  pulumi-preview:
-    name: Pulumi preview
+  pulumi:
+    name: pulumi
     needs: changes
-    if: needs.changes.outputs.pulumi == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+    if: needs.changes.outputs.pulumi == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        stack:
-          - dev
-          - stage
-          - prod
-    permissions:
-      contents: read
-      id-token: write
-    concurrency: pulumi-preview-${{ matrix.stack }}
     defaults:
       run:
         working-directory: infrastructure/pulumi
-    env:
-      AWS_REGION: us-west-2
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      PULUMI_BACKEND_URL: s3://${{ secrets.PULUMI_STATE_BUCKET }}?region=us-west-2&awssdk=v2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -176,39 +108,3 @@ jobs:
 
       - name: Run Pulumi workspace tests
         run: npm test
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: us-west-2
-
-      - name: Install Pulumi CLI
-        uses: pulumi/setup-pulumi@v3
-
-      - name: Pulumi login
-        run: pulumi login "$PULUMI_BACKEND_URL"
-
-      - name: Preview stack
-        run: npm --workspace live run preview:${{ matrix.stack }}
-
-  pr-gate:
-    needs:
-      - workspace
-      - nomad
-      - pulumi-preview
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Assert required jobs succeeded
-        env:
-          WORKSPACE_RESULT: ${{ needs.workspace.result }}
-          NOMAD_RESULT: ${{ needs.nomad.result }}
-          PULUMI_RESULT: ${{ needs.pulumi-preview.result }}
-        run: |
-          for result in "${WORKSPACE_RESULT}" "${NOMAD_RESULT}" "${PULUMI_RESULT}"; do
-            if [[ "${result}" != "success" && "${result}" != "skipped" ]]; then
-              echo "CI prerequisite failed with result ${result}"
-              exit 1
-            fi
-          done

@@ -41,6 +41,23 @@ jobs:
             exit 1
           fi
 
+      - name: Validate required configuration
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PULUMI_STATE_BUCKET: ${{ secrets.PULUMI_STATE_BUCKET }}
+        run: |
+          missing=0
+          for variable in AWS_ROLE_TO_ASSUME CLOUDFLARE_API_TOKEN PULUMI_STATE_BUCKET; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing required secret: ${variable}"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            exit 1
+          fi
+
       - name: Checkout main
         uses: actions/checkout@v4
 

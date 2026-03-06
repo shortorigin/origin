@@ -1,9 +1,7 @@
 name: Delivery Dev
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +19,23 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PULUMI_BACKEND_URL: s3://${{ secrets.PULUMI_STATE_BUCKET }}?region=us-west-2&awssdk=v2
     steps:
+      - name: Validate required configuration
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PULUMI_STATE_BUCKET: ${{ secrets.PULUMI_STATE_BUCKET }}
+        run: |
+          missing=0
+          for variable in AWS_ROLE_TO_ASSUME CLOUDFLARE_API_TOKEN PULUMI_STATE_BUCKET; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing required secret: ${variable}"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
