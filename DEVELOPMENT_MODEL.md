@@ -74,6 +74,7 @@ Every PR must include:
 - technical changes
 - testing strategy
 - deployment impact
+- repository-native language with no leaked Codex, OpenAI, ChatGPT, or other assistant/vendor branding unless required for an external reference or legal attribution
 
 Merge policy:
 
@@ -147,6 +148,7 @@ Reviewers should confirm:
 - tests or relevant checks pass
 - error handling is explicit
 - contracts and docs are updated when needed
+- assistant/vendor branding has not leaked into code, documentation, UI text, fixtures, commits, issues, or PR content
 
 ## Work-In-Progress Limits
 

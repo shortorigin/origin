@@ -15,6 +15,7 @@ All material changes are issue-driven.
 - No direct commits to `main`.
 - PR titles must use conventional commits: `type(scope): description`.
 - The PR body must reference a same-repository issue with `Closes #<issue-id>` or an equivalent issue URL.
+- Source files, docs, UI strings, fixtures, generated assets, commit messages, PR text, and issue text must use repository/product terminology only; do not leak Codex, OpenAI, ChatGPT, or other assistant/vendor branding unless a third-party reference or legal attribution requires it.
 - Required checks must pass before merge.
 - At least one reviewer approval is required before merge.
 - Squash merge is the default merge strategy.
@@ -47,3 +48,5 @@ cargo test --workspace --all-targets
 ```
 
 If your change affects dependency security posture, validate `cargo audit` locally or rely on the `Security Scan` workflow in CI.
+
+During self-review, also remove assistant-generated branding, boilerplate provenance notes, and tool-specific placeholder text before requesting review.
