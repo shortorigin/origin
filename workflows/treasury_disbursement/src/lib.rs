@@ -1,5 +1,3 @@
-pub mod component;
-
 use contracts::{
     AgentActionRequestV1, TreasuryDisbursementRecordedV1, TreasuryDisbursementRequestV1,
     WorkflowBoundaryV1,

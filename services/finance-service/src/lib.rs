@@ -1,5 +1,3 @@
-pub mod component;
-
 use contracts::{ServiceBoundaryV1, TreasuryDisbursementRecordedV1, TreasuryDisbursementRequestV1};
 use enforcement::ApprovedMutationContext;
 use error_model::InstitutionalResult;
