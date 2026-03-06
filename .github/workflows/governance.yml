@@ -20,13 +20,19 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
 
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          install-sccache: "false"
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Validate PR governance
         if: github.event_name == 'pull_request'
@@ -34,4 +40,4 @@ jobs:
 
       - name: Skip governance validation outside pull requests
         if: github.event_name != 'pull_request'
-        run: echo "Governance checks are enforced on pull_request events; merge_group and push runs stay green for stable required checks."
+        run: echo "Governance validation runs only for pull requests."

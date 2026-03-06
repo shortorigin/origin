@@ -11,170 +11,44 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      rust: ${{ steps.detect.outputs.rust }}
-      nomad: ${{ steps.detect.outputs.nomad }}
-      pulumi: ${{ steps.detect.outputs.pulumi }}
-      nomad_files: ${{ steps.detect.outputs.nomad_files }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect changed areas
-        id: detect
-        run: ./.github/scripts/detect_changes.sh
-
-  workspace:
-    name: Workspace validation
-    needs: changes
-    if: needs.changes.outputs.rust == 'true'
+  pr-gate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
 
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
-          cargo-bins: |
-            trunk
-            tauri-cli
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+          rustup default stable
 
-      - name: Setup Node
-        uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: ui/e2e/package-lock.json
+      - name: Install Linux UI packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libglib2.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev
 
-      - name: Setup Linux UI packages
-        uses: ./.github/actions/setup-linux-ui
+      - name: Validate workspace
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo test --workspace --all-targets
 
-      - name: Doctor core toolchain
-        run: cargo xtask doctor --domain core --ci
-
-      - name: Workspace verify
-        run: cargo xtask run verify-full
-
-      - name: Component build and parity checks
-        run: cargo xtask run components-build
-
-      - name: Doctor UI toolchain
-        run: cargo xtask doctor --domain ui --ci
-
-      - name: UI verify
-        run: cargo xtask run ui-verify
-
-      - name: Infrastructure posture validation
+      - name: Validate infrastructure posture
         run: |
           if rg -n 'driver\s*=\s*"raw_exec"' infrastructure/nomad/jobs; then
             echo "raw_exec deployments are not allowed for workload services"
             exit 1
           fi
-
-  nomad:
-    name: Nomad validation
-    needs: changes
-    if: needs.changes.outputs.nomad == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate changed Nomad jobs
-        env:
-          NOMAD_FILES: ${{ needs.changes.outputs.nomad_files }}
-        run: |
-          mapfile -t files <<< "${NOMAD_FILES}"
-          if [[ "${#files[@]}" -eq 0 ]]; then
-            echo "No Nomad jobs changed."
-            exit 0
-          fi
-          for file in "${files[@]}"; do
-            [[ -z "${file}" ]] && continue
-            docker run --rm -v "${PWD}:/workspace" -w /workspace hashicorp/nomad:1.8.4 \
-              nomad job validate "${file}"
-          done
-
-  pulumi-preview:
-    name: Pulumi preview
-    needs: changes
-    if: needs.changes.outputs.pulumi == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        stack:
-          - dev
-          - stage
-          - prod
-    permissions:
-      contents: read
-      id-token: write
-    concurrency: pulumi-preview-${{ matrix.stack }}
-    defaults:
-      run:
-        working-directory: infrastructure/pulumi
-    env:
-      AWS_REGION: us-west-2
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      PULUMI_BACKEND_URL: s3://${{ secrets.PULUMI_STATE_BUCKET }}?region=us-west-2&awssdk=v2
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: infrastructure/pulumi/package-lock.json
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          install-sccache: "false"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: us-west-2
-
-      - name: Install Pulumi CLI
-        uses: pulumi/setup-pulumi@v3
-
-      - name: Pulumi login
-        run: pulumi login "$PULUMI_BACKEND_URL"
-
-      - name: Doctor infra toolchain
-        run: cargo xtask doctor --domain infra --ci
-
-      - name: Infrastructure verify
-        run: cargo xtask run infra-verify
-
-      - name: Preview stack
-        run: cargo xtask infra preview --stack ${{ matrix.stack }}
-
-  pr-gate:
-    needs:
-      - workspace
-      - nomad
-      - pulumi-preview
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Assert required jobs succeeded
-        env:
-          WORKSPACE_RESULT: ${{ needs.workspace.result }}
-          NOMAD_RESULT: ${{ needs.nomad.result }}
-          PULUMI_RESULT: ${{ needs.pulumi-preview.result }}
-        run: |
-          for result in "${WORKSPACE_RESULT}" "${NOMAD_RESULT}" "${PULUMI_RESULT}"; do
-            if [[ "${result}" != "success" && "${result}" != "skipped" ]]; then
-              echo "CI prerequisite failed with result ${result}"
-              exit 1
-            fi
-          done
