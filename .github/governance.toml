@@ -3,13 +3,13 @@ version = 1
 [organization]
 login = "shortorigin"
 governance_repository = ".github"
-governance_repository_description = "Canonical Short Origin GitHub governance, issue forms, pull request templates, and community health files."
+governance_repository_description = "Canonical Origin GitHub governance, issue forms, pull request templates, and community health files."
 
 [repository_defaults]
 default_branch = "main"
 branch_name_pattern = "^(feature|fix|infra|docs|refactor|research)/[0-9]+-[a-z0-9-]+$"
 pr_title_pattern = "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|test)\\([a-z0-9][a-z0-9_-]*\\): [a-z0-9].+$"
-required_status_checks = []
+required_status_checks = ["Governance / validate", "CI / pr-gate", "Security / security-gate"]
 required_approving_review_count = 1
 dismiss_stale_reviews_on_push = true
 require_code_owner_review = true
@@ -25,11 +25,11 @@ title = "Engineering Flow"
 short_description = "Organization-wide GitHub-native Scrumban board for issue-driven delivery and release milestones."
 status_field_name = "Status"
 status_options = ["Backlog", "Ready", "In Progress", "PR Open", "Review", "Done"]
-repository_views = ["short-origin"]
+repository_views = ["origin"]
 milestone_views = ["v0.1 - MVP", "v0.2 - Core Platform", "v0.3 - Beta", "v1.0 - Production"]
 
 [[repositories]]
-name = "short-origin"
+name = "origin"
 link_to_project = true
 
 [[labels]]

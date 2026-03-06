@@ -1,6 +1,6 @@
-# Short Origin
+# Origin
 
-Short Origin is a Rust-first, contract-driven platform organized around explicit module boundaries, typed contracts, and governed delivery workflows. The repository is structured for wasmCloud and Wasmtime deployment, SurrealDB-backed data contracts, and Leptos/Tauri operator surfaces.
+Origin is a Rust-first, contract-driven platform organized around explicit module boundaries, typed contracts, and governed delivery workflows. The repository is structured for wasmCloud and Wasmtime deployment, SurrealDB-backed data contracts, and Leptos/Tauri operator surfaces.
 
 ## Top-Level Modules
 
@@ -18,7 +18,7 @@ Short Origin is a Rust-first, contract-driven platform organized around explicit
 
 ## Development
 
-Short Origin uses a GitHub-native Scrumban model.
+Origin uses a GitHub-native Scrumban model.
 
 1. Start with a GitHub issue.
 2. Work on a short-lived branch named `feature/<issue-id>-description`, `fix/<issue-id>-description`, or the matching approved prefix from [DEVELOPMENT_MODEL.md](/Users/justinshort/short%20origin/DEVELOPMENT_MODEL.md).
@@ -30,6 +30,7 @@ Primary contributor docs:
 - [ARCHITECTURE.md](/Users/justinshort/short%20origin/ARCHITECTURE.md)
 - [CONTRIBUTING.md](/Users/justinshort/short%20origin/CONTRIBUTING.md)
 - [DEVELOPMENT_MODEL.md](/Users/justinshort/short%20origin/DEVELOPMENT_MODEL.md)
+- [Local wasmCloud development](/Users/justinshort/short%20origin/docs/process/wasmcloud-local-dev.md)
 - [SECURITY.md](/Users/justinshort/short%20origin/SECURITY.md)
 
 ## Verification
@@ -46,7 +47,7 @@ The GitHub CI baseline also includes `cargo audit`.
 
 ## Delivery and Release
 
-Short Origin uses a GitHub-native, trunk-based delivery model:
+Origin uses a GitHub-native, trunk-based delivery model:
 
 - `main` is the only long-lived branch.
 - `CI / pr-gate`, `Security / security-gate`, and `Governance / validate` are the required checks.

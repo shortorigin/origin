@@ -1,4 +1,4 @@
-# Short Origin Finance Pipeline Report
+# Origin Finance Pipeline Report
 
 - Seed: `20260305`
 - Experiments: `10`

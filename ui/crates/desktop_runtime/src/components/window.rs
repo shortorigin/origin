@@ -349,7 +349,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
     ));
     let platform_dashboard = create_rw_signal(
         InstitutionalPlatformClientV1 {
-            client_name: "short-origin-shell".to_string(),
+            client_name: "origin-shell".to_string(),
             supported_services: Vec::new(),
             supported_workflows: Vec::new(),
             lattice_config: None,

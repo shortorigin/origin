@@ -97,7 +97,7 @@ pub fn rollout_target_for_environment(environment: &str) -> RolloutTargetV1 {
     RolloutTargetV1 {
         environment: environment.to_string(),
         namespace: environment.to_string(),
-        policy_group: format!("short-origin-{environment}"),
+        policy_group: format!("origin-{environment}"),
     }
 }
 
@@ -168,6 +168,6 @@ mod tests {
         let target = rollout_target_for_environment("stage");
         assert_eq!(target.environment, "stage");
         assert_eq!(target.namespace, "stage");
-        assert_eq!(target.policy_group, "short-origin-stage");
+        assert_eq!(target.policy_group, "origin-stage");
     }
 }

@@ -1,10 +1,11 @@
-use finance_service::component::component_binding as finance_component;
-use lattice_config::{LatticeConfigV1, RolloutTargetV1};
+use lattice_config::{
+    finance_service_component_binding, treasury_disbursement_component_binding, LatticeConfigV1,
+    RolloutTargetV1,
+};
 use sdk_rs::{
     InstitutionalPlatformClientV1, InstitutionalPlatformRuntimeClient, MemoryPlatformTransport,
     ReleasedUiAppV1,
 };
-use treasury_disbursement::component::component_binding as treasury_component;
 
 #[tokio::test]
 async fn lattice_config_and_sdk_smoke_round_trip_component_descriptors() {
@@ -15,7 +16,10 @@ async fn lattice_config_and_sdk_smoke_round_trip_component_descriptors() {
             namespace: "runtime".to_string(),
             policy_group: "institutional-default".to_string(),
         },
-        components: vec![finance_component(), treasury_component()],
+        components: vec![
+            finance_service_component_binding(),
+            treasury_disbursement_component_binding(),
+        ],
     };
 
     let manifest = InstitutionalPlatformClientV1 {

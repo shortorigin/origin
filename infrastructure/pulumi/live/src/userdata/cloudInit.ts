@@ -21,7 +21,7 @@ export function renderCloudInit(args: CloudInitArgs): pulumi.Output<string> {
     return `#!/bin/bash
 set -euxo pipefail
 
-hostnamectl set-hostname short-origin-${hostLabel}
+hostnamectl set-hostname origin-${hostLabel}
 
 # Base packages
 dnf update -y

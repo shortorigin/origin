@@ -112,7 +112,7 @@ pub fn ControlCenterApp(
 
             <Panel variant=SurfaceVariant::Standard>
                 <Stack gap=LayoutGap::Md>
-                    <Heading>"Short Origin Control Center"</Heading>
+                    <Heading>"Origin Control Center"</Heading>
                     <Text tone=TextTone::Secondary>
                         "This shell profile ships only the governed desktop surfaces needed for operational visibility and host-aware workflows."
                     </Text>

@@ -3,8 +3,8 @@ import * as pulumi from "@pulumi/pulumi";
 import * as random from "@pulumi/random";
 
 const config = new pulumi.Config();
-const stateBucketPrefix = config.get("stateBucketPrefix") ?? "short-origin-pulumi-state";
-const lockTableName = config.get("lockTableName") ?? "short-origin-pulumi-locks";
+const stateBucketPrefix = config.get("stateBucketPrefix") ?? "origin-pulumi-state";
+const lockTableName = config.get("lockTableName") ?? "origin-pulumi-locks";
 
 const suffix = new random.RandomId("state-bucket-suffix", {
   byteLength: 4,
@@ -13,7 +13,7 @@ const suffix = new random.RandomId("state-bucket-suffix", {
 const stateBucket = new aws.s3.Bucket("pulumi-state-bucket", {
   bucket: pulumi.interpolate`${stateBucketPrefix}-${suffix.hex}`,
   tags: {
-    Project: "short-origin",
+    Project: "origin",
     ManagedBy: "pulumi",
     Purpose: "state-backend",
   },
@@ -56,7 +56,7 @@ const lockTable = new aws.dynamodb.Table("pulumi-lock-table", {
     },
   ],
   tags: {
-    Project: "short-origin",
+    Project: "origin",
     ManagedBy: "pulumi",
     Purpose: "state-locks",
   },

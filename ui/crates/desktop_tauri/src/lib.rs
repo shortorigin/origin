@@ -1,4 +1,4 @@
-//! Tauri desktop shell bootstrap for the Short Origin OS runtime/app crates.
+//! Tauri desktop shell bootstrap for the Origin OS runtime/app crates.
 //!
 //! This crate owns the native desktop bootstrap and keeps Tauri command registration localized so
 //! host-domain IPC handlers can evolve without coupling the shared runtime layer directly to Tauri

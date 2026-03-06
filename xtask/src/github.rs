@@ -701,7 +701,7 @@ fn branch_ruleset_payload(config: &GovernanceConfig) -> Value {
             {
                 "type": "branch_name_pattern",
                 "parameters": {
-                    "name": "Short Origin branch naming",
+                    "name": "Origin branch naming",
                     "negate": false,
                     "operator": "regex",
                     "pattern": ruleset_branch_pattern(&config.repository_defaults.branch_name_pattern)
@@ -796,7 +796,7 @@ fn default_repository(config: &GovernanceConfig) -> String {
     if let Some(repository) = config.repositories.first() {
         repository_full_name(config, repository)
     } else {
-        format!("{}/short-origin", config.organization.login)
+        format!("{}/origin", config.organization.login)
     }
 }
 
@@ -1005,7 +1005,7 @@ mod tests {
             title: "feat(db): add provider".to_owned(),
             body: "## Linked Issue\n#142".to_owned(),
             branch: "feature/142-surrealdb-provider".to_owned(),
-            repository: "shortorigin/short-origin".to_owned(),
+            repository: "shortorigin/origin".to_owned(),
         };
 
         validate_pr_event(&config, &event)
@@ -1019,7 +1019,7 @@ mod tests {
             title: "feat(db): add provider".to_owned(),
             body: "## Linked Issue\nTBD".to_owned(),
             branch: "feature/142-surrealdb-provider".to_owned(),
-            repository: "shortorigin/short-origin".to_owned(),
+            repository: "shortorigin/origin".to_owned(),
         };
 
         let error = validate_pr_event(&config, &event)

@@ -2,7 +2,7 @@
 name = "desktop_tauri"
 version = "0.1.0"
 edition = "2021"
-description = "Tauri desktop shell host for the Short Origin OS Leptos runtime."
+description = "Tauri desktop shell host for the Origin OS Leptos runtime."
 
 [[bin]]
 name = "desktop_tauri"

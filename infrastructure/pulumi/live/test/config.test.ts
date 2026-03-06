@@ -3,7 +3,7 @@ import { validateInfraConfig } from "../src/config/schema";
 
 describe("validateInfraConfig", () => {
   const base = {
-    projectName: "short-origin",
+    projectName: "origin",
     env: "dev" as const,
     awsRegion: "us-west-2",
     vpcCidr: "10.40.0.0/16",
@@ -15,9 +15,9 @@ describe("validateInfraConfig", () => {
     subdomain: "dev.api",
     cloudflareAccountId: "acct",
     cloudflareZoneId: "zone",
-    tunnelName: "short-origin-dev",
+    tunnelName: "origin-dev",
     servicePort: 8080,
-    ssmPathPrefix: "/short-origin",
+    ssmPathPrefix: "/origin",
     wasmcloudVersion: "1.2.1",
     surrealdbVersion: "2.2.1",
   };
@@ -51,7 +51,7 @@ describe("validateInfraConfig", () => {
       ...base,
       env: "stage" as const,
       subdomain: "stage.api",
-      tunnelName: "short-origin-stage",
+      tunnelName: "origin-stage",
     });
 
     expect(parsed.env).toBe("stage");

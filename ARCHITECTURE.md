@@ -2,7 +2,7 @@
 
 ## Summary
 
-Short Origin is organized around explicit module ownership, versioned contracts, and workflow-gated mutations.
+Origin is organized around explicit module ownership, versioned contracts, and workflow-gated mutations.
 
 - `enterprise/` owns ontology and policy meaning.
 - `schemas/` owns canonical contracts, events, and schema semantics.

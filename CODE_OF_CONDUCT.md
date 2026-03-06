@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Short Origin expects contributors to collaborate professionally and constructively.
+Origin expects contributors to collaborate professionally and constructively.
 
 ## Expected Behavior
 

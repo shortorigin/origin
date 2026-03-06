@@ -224,6 +224,6 @@ mod tests {
         let target = rollout_target_for_environment("stage");
         assert_eq!(target.environment, "stage");
         assert_eq!(target.namespace, "stage");
-        assert_eq!(target.policy_group, "short-origin-stage");
+        assert_eq!(target.policy_group, "origin-stage");
     }
 }
