@@ -56,6 +56,11 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-core-ubuntu-stable-v1
+          cache-all-crates: "false"
+          cache-bin: "false"
+          cache-workspace-crates: "false"
 
       - name: Setup ORAS
         uses: oras-project/setup-oras@v1

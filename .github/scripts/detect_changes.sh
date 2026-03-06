@@ -9,6 +9,8 @@ mapfile -t all_nomad_jobs < <(find infrastructure/nomad/jobs -type f -name '*.no
 
 if [[ "${event_name}" == "merge_group" ]]; then
   rust_changed=true
+  rust_core_changed=true
+  rust_ui_changed=true
   nomad_changed=true
   pulumi_changed=true
   changed_files="$(git ls-files)"
@@ -36,6 +38,8 @@ else
   fi
 
   rust_changed=false
+  rust_core_changed=false
+  rust_ui_changed=false
   nomad_changed=false
   pulumi_changed=false
   nomad_files=()
@@ -46,6 +50,18 @@ else
     case "${file}" in
       .cargo/*|AGENTS.md|Cargo.toml|Cargo.lock|shared/*|enterprise/*|schemas/*|platform/*|services/*|workflows/*|ui/*|xtask/*|agents/*|.github/workflows/*|.github/scripts/*)
         rust_changed=true
+        ;;
+    esac
+
+    case "${file}" in
+      .cargo/*|AGENTS.md|Cargo.toml|Cargo.lock|shared/*|enterprise/*|schemas/*|platform/*|services/*|workflows/*|xtask/*|agents/*|.github/workflows/*|.github/scripts/*)
+        rust_core_changed=true
+        ;;
+    esac
+
+    case "${file}" in
+      .cargo/*|AGENTS.md|Cargo.toml|Cargo.lock|shared/*|schemas/*|platform/*|ui/*|xtask/*|.github/workflows/*|.github/scripts/*)
+        rust_ui_changed=true
         ;;
     esac
 
@@ -66,6 +82,8 @@ fi
 
 {
   echo "rust=${rust_changed}"
+  echo "rust_core=${rust_core_changed}"
+  echo "rust_ui=${rust_ui_changed}"
   echo "nomad=${nomad_changed}"
   echo "pulumi=${pulumi_changed}"
   echo "nomad_files<<__NOMAD__"
