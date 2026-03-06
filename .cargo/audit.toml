@@ -1,0 +1,20 @@
+[advisories]
+# False-positive match against the workspace `telemetry` crate name.
+# Remove once the advisory tooling no longer conflates it with the published crate.
+ignore = [
+    "RUSTSEC-2021-0046",
+    # Wasmtime 30.x advisories pending a coordinated runtime upgrade.
+    "RUSTSEC-2025-0046",
+    "RUSTSEC-2025-0118",
+    "RUSTSEC-2026-0006",
+    "RUSTSEC-2026-0020",
+    "RUSTSEC-2026-0021",
+    # Transitive via Tauri/urlpattern until upstream replaces the unmaintained unic crates.
+    "RUSTSEC-2025-0080",
+    "RUSTSEC-2025-0098",
+    "RUSTSEC-2025-0100",
+    # Transitive via GTK/WebKit dependencies in the current Tauri desktop stack.
+    "RUSTSEC-2024-0429",
+    # Transitive via surrealdb-core -> surrealkv until an upstream fix lands.
+    "RUSTSEC-2026-0002",
+]

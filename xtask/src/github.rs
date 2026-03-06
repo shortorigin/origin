@@ -984,7 +984,10 @@ mod tests {
         assert_eq!(config.project.title, "Engineering Flow");
         assert!(config.repository_defaults.allow_auto_merge);
         assert!(!config.repository_defaults.require_code_owner_review);
-        assert_eq!(config.repository_defaults.required_approving_review_count, 0);
+        assert_eq!(
+            config.repository_defaults.required_approving_review_count,
+            0
+        );
         assert_eq!(
             config.repository_defaults.required_status_checks,
             vec![
