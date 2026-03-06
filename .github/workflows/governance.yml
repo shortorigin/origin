@@ -8,10 +8,6 @@ on:
       - reopened
       - synchronize
       - ready_for_review
-  merge_group:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -30,9 +26,4 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Validate PR governance
-        if: github.event_name == 'pull_request'
         run: cargo xtask github validate-pr --event-path "$GITHUB_EVENT_PATH" --config .github/governance.toml
-
-      - name: Skip governance validation outside pull requests
-        if: github.event_name != 'pull_request'
-        run: echo "Governance checks are enforced on pull_request events; merge_group and push runs stay green for stable required checks."

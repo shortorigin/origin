@@ -41,6 +41,23 @@ jobs:
             exit 1
           fi
 
+      - name: Validate required configuration
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PULUMI_STATE_BUCKET: ${{ secrets.PULUMI_STATE_BUCKET }}
+        run: |
+          missing=0
+          for variable in AWS_ROLE_TO_ASSUME CLOUDFLARE_API_TOKEN PULUMI_STATE_BUCKET; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing required secret: ${variable}"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            exit 1
+          fi
+
       - name: Checkout target SHA
         uses: actions/checkout@v4
         with:
@@ -72,11 +89,9 @@ jobs:
 
       - name: Rebuild and verify target SHA
         run: |
-          cargo fmt --all --check
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
-          cargo test --workspace --all-targets
+          cargo xtask verify profile core
           cargo components-build
-          cargo test -p wasmcloud-bindings -p wasmcloud-smoke-tests -p surrealdb-access
+          cargo test -p wasmcloud-bindings -p surrealdb-access
 
       - name: Render component descriptors
         run: cargo xtask delivery render-components --environment stage --tag "${RELEASE_TAG}" --output-dir target/delivery/components

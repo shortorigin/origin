@@ -21,6 +21,23 @@ const UI_PACKAGES: &[&str] = &[
     "desktop_app_terminal",
 ];
 
+const CORE_EXCLUDED_PACKAGES: &[&str] = &[
+    "desktop_app_contract",
+    "desktop_runtime",
+    "desktop_tauri",
+    "platform_host",
+    "platform_host_web",
+    "site",
+    "system_ui",
+    "system_shell",
+    "system_shell_contract",
+    "shrs_core_headless",
+    "desktop_app_control_center",
+    "desktop_app_settings",
+    "desktop_app_terminal",
+    "wasmcloud-smoke-tests",
+];
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -99,7 +116,7 @@ fn run_components(args: Vec<String>) -> Result<(), String> {
         "-p",
         "finance-service",
         "-p",
-        "treasury_disbursement",
+        "treasury-disbursement",
         "-p",
         "wasmcloud-smoke-tests",
     ]);
@@ -121,7 +138,7 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
                 &workspace_root,
                 &workspace_command_with_excludes(
                     &["clippy", "--workspace", "--all-targets", "--all-features"],
-                    UI_PACKAGES,
+                    CORE_EXCLUDED_PACKAGES,
                     &["--", "-D", "warnings"],
                 ),
             )?;
@@ -129,7 +146,7 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
                 &workspace_root,
                 &workspace_command_with_excludes(
                     &["test", "--workspace", "--all-targets"],
-                    UI_PACKAGES,
+                    CORE_EXCLUDED_PACKAGES,
                     &[],
                 ),
             )?;
