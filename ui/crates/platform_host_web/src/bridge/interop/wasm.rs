@@ -12,6 +12,7 @@ use platform_host::ExplorerPermissionMode;
 const DB_NAME = 'retrodesk_os';
 const DB_VERSION = 1;
 const APP_STATE_STORE = 'app_state';
+const PREFS_STORE = 'prefs';
 const VFS_STORE = 'vfs_nodes';
 const FS_CONFIG_STORE = 'fs_config';
 
@@ -66,6 +67,9 @@ req.onupgradeneeded = () => {
   const db = req.result;
   if (!db.objectStoreNames.contains(APP_STATE_STORE)) {
     db.createObjectStore(APP_STATE_STORE, { keyPath: 'namespace' });
+  }
+  if (!db.objectStoreNames.contains(PREFS_STORE)) {
+    db.createObjectStore(PREFS_STORE, { keyPath: 'key' });
   }
   if (!db.objectStoreNames.contains(VFS_STORE)) {
     const store = db.createObjectStore(VFS_STORE, { keyPath: 'path' });
@@ -636,8 +640,8 @@ async function prefsLoad(key) {
   if (tauri.available) {
     return tauri.value ?? null;
   }
-  const storage = (typeof window !== 'undefined') ? window.localStorage : null;
-  return storage ? storage.getItem(key) : null;
+  const row = await getByKey(PREFS_STORE, key);
+  return row?.raw_json ?? null;
 }
 
 async function prefsSave(key, rawJson) {
@@ -645,9 +649,7 @@ async function prefsSave(key, rawJson) {
   if (tauri.available) {
     return null;
   }
-  const storage = (typeof window !== 'undefined') ? window.localStorage : null;
-  if (!storage) fail('localStorage unavailable');
-  storage.setItem(key, rawJson);
+  await putRecord(PREFS_STORE, { key, raw_json: rawJson, updated_at_unix_ms: nowMs() });
   return null;
 }
 
@@ -656,9 +658,7 @@ async function prefsDelete(key) {
   if (tauri.available) {
     return null;
   }
-  const storage = (typeof window !== 'undefined') ? window.localStorage : null;
-  if (!storage) return null;
-  storage.removeItem(key);
+  await deleteByKey(PREFS_STORE, key);
   return null;
 }
 

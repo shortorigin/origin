@@ -1778,6 +1778,7 @@ dependencies = [
  "nu-protocol",
  "nu-table",
  "platform_host",
+ "platform_host_web",
  "pretty_assertions",
  "sdk-rs",
  "serde",
@@ -7103,6 +7104,7 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "platform_host_web",
+ "wasm-bindgen",
  "web-sys",
 ]
 

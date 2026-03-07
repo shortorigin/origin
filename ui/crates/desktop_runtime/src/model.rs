@@ -148,13 +148,13 @@ pub struct WindowRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 /// Typed desktop skin variants rendered by the shell root `data-skin` attribute.
 pub enum DesktopSkin {
-    /// Soft neumorphic skin with restrained depth cues and adaptive light/dark parity.
-    #[serde(rename = "soft-neumorphic")]
-    #[default]
-    SoftNeumorphic,
     /// Modern adaptive skin with dark-first token language and light/dark remapping.
     #[serde(rename = "modern-adaptive")]
+    #[default]
     ModernAdaptive,
+    /// Soft neumorphic skin with restrained depth cues and adaptive light/dark parity.
+    #[serde(rename = "soft-neumorphic")]
+    SoftNeumorphic,
     /// Classic XP-inspired nostalgic skin.
     #[serde(rename = "classic-xp")]
     ClassicXp,
@@ -167,8 +167,8 @@ impl DesktopSkin {
     /// Stable CSS skin id exposed on the shell root `data-skin` attribute.
     pub const fn css_id(&self) -> &'static str {
         match self {
-            Self::SoftNeumorphic => "soft-neumorphic",
             Self::ModernAdaptive => "modern-adaptive",
+            Self::SoftNeumorphic => "soft-neumorphic",
             Self::ClassicXp => "classic-xp",
             Self::Classic95 => "classic-95",
         }
@@ -177,8 +177,8 @@ impl DesktopSkin {
     /// Human-readable label used by UI skin pickers.
     pub const fn label(&self) -> &'static str {
         match self {
-            Self::SoftNeumorphic => "Soft Neumorphic",
             Self::ModernAdaptive => "Modern Adaptive",
+            Self::SoftNeumorphic => "Soft Neumorphic",
             Self::ClassicXp => "Classic XP",
             Self::Classic95 => "Classic 95",
         }
@@ -186,8 +186,8 @@ impl DesktopSkin {
 
     /// Stable ordered list of selectable shell skins.
     pub const ALL: [Self; 4] = [
-        Self::SoftNeumorphic,
         Self::ModernAdaptive,
+        Self::SoftNeumorphic,
         Self::ClassicXp,
         Self::Classic95,
     ];
@@ -198,7 +198,7 @@ impl DesktopSkin {
 pub struct DesktopTheme {
     /// Typed skin preset rendered as the shell root `data-skin`.
     ///
-    /// This defaults to [`DesktopSkin::SoftNeumorphic`] for fresh state and legacy persisted
+    /// This defaults to [`DesktopSkin::ModernAdaptive`] for fresh state and legacy persisted
     /// payloads that omitted the typed `skin` field.
     #[serde(default)]
     pub skin: DesktopSkin,

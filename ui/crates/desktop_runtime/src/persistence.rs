@@ -187,7 +187,12 @@ pub async fn load_theme(host: &DesktopHostContext) -> Option<DesktopTheme> {
     match load_pref_with(host.prefs_store().as_ref(), THEME_KEY).await {
         Ok(Some(theme)) => Some(theme),
         Ok(None) => load_legacy_theme(host).await.map(|legacy| DesktopTheme {
-            skin: legacy.skin,
+            skin: match legacy.skin {
+                crate::model::DesktopSkin::SoftNeumorphic => {
+                    crate::model::DesktopSkin::ModernAdaptive
+                }
+                other => other,
+            },
             high_contrast: legacy.high_contrast,
             reduced_motion: legacy.reduced_motion,
             audio_enabled: legacy.audio_enabled,

@@ -1,14 +1,10 @@
-//! `localStorage`-backed preference store implementation.
-//!
-//! This adapter is intentionally small and synchronous at the browser API boundary, while also
-//! implementing [`platform_host::PrefsStore`] (async trait) for compatibility with higher-level
-//! host abstractions.
+//! Browser preference storage implementation backed by IndexedDB via the shared bridge.
 
 use platform_host::{PrefsStore, PrefsStoreFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Debug, Clone, Copy, Default)]
-/// Browser preference store backed by `window.localStorage`.
+/// Browser preference store backed by IndexedDB through the shared bridge.
 pub struct WebPrefsStore;
 
 impl WebPrefsStore {
@@ -16,8 +12,9 @@ impl WebPrefsStore {
     pub fn load_json(self, key: &str) -> Option<String> {
         #[cfg(target_arch = "wasm32")]
         {
-            let storage = web_sys::window()?.local_storage().ok().flatten()?;
-            storage.get_item(key).ok().flatten()
+            futures::executor::block_on(crate::bridge::load_pref(key))
+                .ok()
+                .flatten()
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -31,16 +28,11 @@ impl WebPrefsStore {
     ///
     /// # Errors
     ///
-    /// Returns an error when localStorage is unavailable or the write fails.
+    /// Returns an error when browser persistence is unavailable or the write fails.
     pub fn save_json(self, key: &str, raw_json: &str) -> Result<(), String> {
         #[cfg(target_arch = "wasm32")]
         {
-            let storage = web_sys::window()
-                .and_then(|w| w.local_storage().ok().flatten())
-                .ok_or_else(|| "localStorage unavailable".to_string())?;
-            storage
-                .set_item(key, raw_json)
-                .map_err(|e| format!("localStorage set_item failed: {e:?}"))
+            futures::executor::block_on(crate::bridge::save_pref(key, raw_json))
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -50,21 +42,15 @@ impl WebPrefsStore {
         }
     }
 
-    /// Deletes a preference key from localStorage.
+    /// Deletes a preference key from IndexedDB-backed browser persistence.
     ///
     /// # Errors
     ///
-    /// Returns an error when localStorage is unavailable or the delete fails.
+    /// Returns an error when browser persistence is unavailable or the delete fails.
     pub fn delete_json(self, key: &str) -> Result<(), String> {
         #[cfg(target_arch = "wasm32")]
         {
-            let storage = web_sys::window()
-                .and_then(|w| w.local_storage().ok().flatten())
-                .ok_or_else(|| "localStorage unavailable".to_string())?;
-            storage
-                .remove_item(key)
-                .map_err(|e| format!("localStorage remove_item failed: {e:?}"))?;
-            Ok(())
+            futures::executor::block_on(crate::bridge::delete_pref(key))
         }
 
         #[cfg(not(target_arch = "wasm32"))]

@@ -8,6 +8,8 @@
 
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
+mod browser_navigation;
+mod pwa;
 mod web_app;
 
 pub use web_app::{DesktopEntry, SiteApp};

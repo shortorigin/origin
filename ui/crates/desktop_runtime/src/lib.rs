@@ -80,8 +80,8 @@ pub use host::DesktopHostContext;
 pub use model::*;
 /// Re-exported persistence entrypoints used by the shell runtime.
 pub use persistence::{
-    load_boot_snapshot, load_theme, load_wallpaper, persist_layout_snapshot,
-    persist_terminal_history, persist_theme, persist_wallpaper,
+    load_boot_snapshot, load_durable_boot_snapshot, load_theme, load_wallpaper,
+    persist_layout_snapshot, persist_terminal_history, persist_theme, persist_wallpaper,
 };
 /// Re-exported wallpaper contracts owned by the host boundary.
 pub use platform_host::{
