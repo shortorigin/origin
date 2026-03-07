@@ -20,6 +20,14 @@ const DESKTOP_THEME_CSS: &str = concat!(
     include_str!("styles/a11y.css"),
 );
 
+fn note_shell_compatibility_href(slug: &str) -> String {
+    format!("/?open=notes:{slug}")
+}
+
+fn project_shell_compatibility_href(slug: &str) -> String {
+    format!("/?open=projects:{slug}")
+}
+
 #[component]
 /// Root application component that configures metadata, routes, and the desktop shell entrypoint.
 pub fn SiteApp() -> impl IntoView {
@@ -92,7 +100,9 @@ fn BrowserShellSync() -> impl IntoView {
 
     #[cfg(target_arch = "wasm32")]
     {
-        use desktop_runtime::{load_durable_boot_snapshot, load_theme, load_wallpaper};
+        use desktop_runtime::{
+            load_durable_boot_snapshot, load_theme, load_wallpaper, HydrationMode,
+        };
         use wasm_bindgen::{closure::Closure, JsCast};
 
         let host = _runtime.host.get_value();
@@ -141,6 +151,7 @@ fn BrowserShellSync() -> impl IntoView {
                                 if let Some(snapshot) = load_durable_boot_snapshot(&host).await {
                                     runtime.dispatch_action(DesktopAction::HydrateSnapshot {
                                         snapshot,
+                                        mode: HydrationMode::SyncRefresh,
                                     });
                                 }
                             });
@@ -176,8 +187,8 @@ fn CanonicalNoteRoute() -> impl IntoView {
         <section class="canonical-content canonical-note">
             <h1>"Note"</h1>
             <p>{move || format!("Slug: {}", slug())}</p>
-            <p>"Browser-native note route with shell compatibility open intents."</p>
-            <A href=move || format!("/?open=notes:{}", slug())>"Open in Shell"</A>
+            <p>"Browser-native note compatibility route that opens the shell's Settings-based compatibility route."</p>
+            <A href=move || note_shell_compatibility_href(&slug())>"Open in Shell"</A>
         </section>
     }
 }
@@ -195,8 +206,29 @@ fn CanonicalProjectRoute() -> impl IntoView {
         <section class="canonical-content canonical-project">
             <h1>"Project"</h1>
             <p>{move || format!("Slug: {}", slug())}</p>
-            <p>"Browser-native project route with shell compatibility open intents."</p>
-            <A href=move || format!("/?open=projects:{}", slug())>"Open in Shell"</A>
+            <p>"Browser-native project compatibility route that opens the shell's Control Center compatibility route."</p>
+            <A href=move || project_shell_compatibility_href(&slug())>"Open in Shell"</A>
         </section>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn note_shell_open_link_uses_compatibility_route() {
+        assert_eq!(
+            note_shell_compatibility_href("roadmap"),
+            "/?open=notes:roadmap"
+        );
+    }
+
+    #[test]
+    fn project_shell_open_link_uses_compatibility_route() {
+        assert_eq!(
+            project_shell_compatibility_href("alpha"),
+            "/?open=projects:alpha"
+        );
     }
 }

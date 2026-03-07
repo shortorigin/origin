@@ -908,6 +908,13 @@ export async function jsOpenExternalUrl(url) {
   if (!opened) fail(`Failed to open external URL: ${url}`);
   return null;
 }
+export async function jsNotifySend(title, body) {
+  if (!title || typeof title !== 'string') fail('Notification title is required');
+  const tauri = await tauriInvoke('notify_send', { title, body: body || '' });
+  if (tauri.available) return tauri.value ?? null;
+  const rendered = !body || !String(body).trim() ? title : `${title}: ${body}`;
+  return await new Notification(rendered);
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = jsAppStateLoad)]
@@ -956,6 +963,8 @@ extern "C" {
     fn js_explorer_clear_native_root() -> Promise;
     #[wasm_bindgen(js_name = jsOpenExternalUrl)]
     fn js_open_external_url(url: &str) -> Promise;
+    #[wasm_bindgen(js_name = jsNotifySend)]
+    fn js_notify_send(title: &str, body: &str) -> Promise;
 }
 
 async fn await_promise(promise: Promise) -> Result<JsValue, String> {
@@ -1109,5 +1118,10 @@ pub async fn explorer_clear_native_root() -> Result<ExplorerBackendStatus, Strin
 
 pub async fn open_external_url(url: &str) -> Result<(), String> {
     let _ = await_promise(js_open_external_url(url)).await?;
+    Ok(())
+}
+
+pub async fn send_notification(title: &str, body: &str) -> Result<(), String> {
+    let _ = await_promise(js_notify_send(title, body)).await?;
     Ok(())
 }

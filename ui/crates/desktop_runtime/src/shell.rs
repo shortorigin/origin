@@ -507,6 +507,7 @@ fn resolve_open_target(target: &str) -> Option<DesktopAction> {
         });
     }
     if let Some(slug) = target.strip_prefix("notes:") {
+        // Notes remain a compatibility route into the shell's Settings-based experience.
         return Some(DesktopAction::OpenWindow(
             crate::reducer::build_open_request_from_deeplink(
                 crate::model::DeepLinkOpenTarget::NotesSlug(slug.to_string()),
@@ -514,6 +515,7 @@ fn resolve_open_target(target: &str) -> Option<DesktopAction> {
         ));
     }
     if let Some(slug) = target.strip_prefix("projects:") {
+        // Projects remain a compatibility route into the shell's Control Center experience.
         return Some(DesktopAction::OpenWindow(
             crate::reducer::build_open_request_from_deeplink(
                 crate::model::DeepLinkOpenTarget::ProjectSlug(slug.to_string()),
@@ -820,7 +822,8 @@ fn open_registration(runtime: DesktopRuntimeContext) -> AppCommandRegistration {
             "open <target>",
             vec![CommandArgSpec {
                 name: "target".to_string(),
-                summary: "Canonical app id or deep-link target such as notes:slug.".to_string(),
+                summary: "Canonical app id or compatibility deep-link target such as notes:slug."
+                    .to_string(),
                 required: true,
                 repeatable: false,
             }],
