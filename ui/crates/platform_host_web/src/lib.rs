@@ -20,9 +20,14 @@
 pub mod adapters;
 mod bridge;
 pub mod cache;
+pub mod cross_context;
 pub mod external_url;
+pub mod file_access;
 pub mod fs;
+pub mod navigation;
 pub mod notifications;
+pub mod persistence;
+pub mod pwa;
 pub mod storage;
 pub mod wallpaper;
 
@@ -35,6 +40,7 @@ pub use adapters::{
 };
 pub use cache::cache_api::WebContentCache;
 pub use cache::tauri_cache_api::TauriContentCache;
+pub use cross_context::{broadcast_channel_supported, publish_shell_sync_event, ShellSyncEvent};
 pub use external_url::{TauriExternalUrlService, WebExternalUrlService};
 pub use fs::explorer::{TauriExplorerFsService, WebExplorerFsService};
 pub use notifications::{TauriNotificationService, WebNotificationService};

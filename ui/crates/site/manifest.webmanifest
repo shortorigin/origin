@@ -1,0 +1,16 @@
+{
+  "name": "Origin OS",
+  "short_name": "Origin",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1724",
+  "theme_color": "#0f1724",
+  "description": "Rust-first browser shell built on WebAssembly and standard browser APIs.",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
