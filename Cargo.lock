@@ -7100,6 +7100,7 @@ dependencies = [
  "console_error_panic_hook",
  "desktop_app_contract",
  "desktop_runtime",
+ "js-sys",
  "leptos",
  "leptos_meta",
  "leptos_router",
@@ -10279,10 +10280,12 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "lattice-config",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "toml 0.8.23",
 ]
 

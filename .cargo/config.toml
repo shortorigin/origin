@@ -2,6 +2,7 @@
 xtask = "run -p xtask --"
 ui-dev = "xtask ui dev"
 ui-build = "xtask ui build"
+ui-harden = "xtask ui-hardening"
 tauri-dev = "xtask tauri dev"
 tauri-build = "xtask tauri build"
 components-build = "xtask components build"

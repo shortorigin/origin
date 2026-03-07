@@ -47,7 +47,7 @@ jobs:
           cache-dependency-path: infrastructure/pulumi/package-lock.json
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.91.1
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2

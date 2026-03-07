@@ -20,7 +20,7 @@ fn public_asset_path(base_path: &str, asset: &str) -> String {
 #[cfg(target_arch = "wasm32")]
 fn current_public_base_path() -> Option<String> {
     let document = web_sys::window()?.document()?;
-    let base_uri = document.base_uri().ok()?;
+    let base_uri = document.base_uri().ok().flatten()?;
     let url = web_sys::Url::new(&base_uri).ok()?;
     Some(url.pathname())
 }
