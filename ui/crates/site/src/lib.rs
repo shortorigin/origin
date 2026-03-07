@@ -21,5 +21,15 @@ pub use web_app::{DesktopEntry, SiteApp};
 /// `csr` feature enabled.
 pub fn mount() {
     console_error_panic_hook::set_once();
-    leptos::mount_to_body(|| leptos::view! { <SiteApp /> })
+    use wasm_bindgen::JsCast;
+
+    let document = web_sys::window()
+        .and_then(|window| window.document())
+        .expect("window document should be available for CSR mount");
+    let app_root = document
+        .get_element_by_id("app")
+        .expect("site app root element should exist")
+        .dyn_into::<web_sys::HtmlElement>()
+        .expect("site app root should be an HtmlElement");
+    leptos::mount_to(app_root, || leptos::view! { <SiteApp /> })
 }
