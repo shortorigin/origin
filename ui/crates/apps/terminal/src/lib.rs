@@ -413,8 +413,9 @@ pub fn TerminalApp(
         last_saved.set(Some(serialized));
 
         if let Some(services) = services_for_persist.clone() {
+            let state_service = services.state.clone();
             if let Ok(value) = serde_json::to_value(&snapshot) {
-                services.state.persist_window_state(value);
+                state_service.persist_window_state(value);
             }
         }
     });

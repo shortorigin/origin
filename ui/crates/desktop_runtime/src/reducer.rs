@@ -212,6 +212,13 @@ pub enum DesktopAction {
     HydrateSnapshot {
         /// Snapshot payload to restore.
         snapshot: DesktopSnapshot,
+        /// Hydration intent controlling lifecycle replay.
+        mode: HydrationMode,
+    },
+    /// Hydrates the runtime policy overlay for the current session.
+    HydratePolicyOverlay {
+        /// App ids elevated by the policy overlay.
+        privileged_app_ids: Vec<String>,
     },
     /// Apply URL-derived deep-link instructions.
     ApplyDeepLink {
@@ -336,7 +343,16 @@ pub enum RuntimeEffect {
     },
 }
 
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Controls whether snapshot hydration is restoring boot state or synchronizing a live session.
+pub enum HydrationMode {
+    /// Restores a boot snapshot into an empty/new runtime session.
+    BootRestore,
+    /// Synchronizes persisted state into an already-running session.
+    SyncRefresh,
+}
+
+#[derive(Debug, Error, Clone, PartialEq)]
 /// Reducer errors for invalid actions (for example, referencing a missing window).
 pub enum ReducerError {
     /// The target window id was not found in the current state.
@@ -345,6 +361,24 @@ pub enum ReducerError {
     /// A wallpaper configuration violated runtime constraints.
     #[error("invalid wallpaper configuration: {0}")]
     InvalidWallpaperConfig(String),
+    /// The requested transition is blocked by an active modal window.
+    #[error("active modal window {active_modal:?} blocks this transition")]
+    ModalBlocked {
+        /// The modal window that must be resolved first.
+        active_modal: WindowId,
+    },
+    /// The app attempted to use a capability that is not granted.
+    #[error("app `{app_id}` is not authorized for capability `{capability:?}`")]
+    CapabilityDenied {
+        /// Canonical application identifier.
+        app_id: String,
+        /// The missing capability.
+        capability: AppCapability,
+        /// Source window receiving the denial diagnostic.
+        window_id: WindowId,
+        /// App-visible denial diagnostic envelope.
+        diagnostic_event: Box<AppEvent>,
+    },
 }
 
 fn clamp_window_rect_to_viewport(rect: WindowRect, viewport: WindowRect) -> WindowRect {
@@ -423,6 +457,7 @@ pub fn reduce_desktop(
         DesktopAction::OpenWindow(req) => {
             let previously_focused = state.focused_window_id();
             let window_id = next_window_id(state);
+            begin_modal_open(state, window_id, &req)?;
             let default_offset = ((window_id.0 as i32) - 1) % 8 * 20;
             let viewport = req.viewport.unwrap_or(WindowRect {
                 x: 0,
@@ -478,7 +513,9 @@ pub fn reduce_desktop(
             effects.push(RuntimeEffect::FocusWindowInput(window_id));
         }
         DesktopAction::CloseWindow { window_id } => {
+            ensure_parent_close_allowed(state, window_id)?;
             let was_focused = state.focused_window_id() == Some(window_id);
+            let modal_parent_to_focus = complete_modal_close(state, window_id);
             effects.push(RuntimeEffect::DispatchLifecycle {
                 window_id,
                 event: AppLifecycleEvent::Closing,
@@ -488,21 +525,24 @@ pub fn reduce_desktop(
             if state.windows.len() == before_len {
                 return Err(ReducerError::WindowNotFound);
             }
-            if state.active_modal == Some(window_id) {
-                state.active_modal = None;
-            }
             normalize_window_stack(state);
             effects.push(RuntimeEffect::DispatchLifecycle {
                 window_id,
                 event: AppLifecycleEvent::Closed,
             });
-            if was_focused {
+            if let Some(parent_id) = modal_parent_to_focus {
+                if focus_window_internal(state, parent_id) {
+                    emit_focus_transition(Some(window_id), Some(parent_id), state, &mut effects);
+                    effects.push(RuntimeEffect::FocusWindowInput(parent_id));
+                }
+            } else if was_focused {
                 let new_focus = state.focused_window_id();
                 emit_focus_transition(Some(window_id), new_focus, state, &mut effects);
             }
             effects.push(RuntimeEffect::PersistLayout);
         }
         DesktopAction::FocusWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             if !focus_window_internal(state, window_id) {
                 return Err(ReducerError::WindowNotFound);
@@ -512,6 +552,7 @@ pub fn reduce_desktop(
             effects.push(RuntimeEffect::FocusWindowInput(window_id));
         }
         DesktopAction::MinimizeWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             let should_suspend = {
                 let window = find_window_mut(state, window_id)?;
@@ -549,6 +590,7 @@ pub fn reduce_desktop(
             window_id,
             viewport,
         } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             let was_suspended = {
                 let window = find_window_mut(state, window_id)?;
@@ -576,6 +618,7 @@ pub fn reduce_desktop(
             effects.push(RuntimeEffect::PersistLayout);
         }
         DesktopAction::RestoreWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             let was_suspended = {
                 let window = find_window_mut(state, window_id)?;
@@ -610,6 +653,7 @@ pub fn reduce_desktop(
             effects.push(RuntimeEffect::FocusWindowInput(window_id));
         }
         DesktopAction::ToggleTaskbarWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let focused = state.focused_window_id() == Some(window_id);
             let minimized = state
                 .windows
@@ -644,6 +688,7 @@ pub fn reduce_desktop(
             state.start_menu_open = false;
         }
         DesktopAction::BeginMove { window_id, pointer } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             let rect_start = find_window_mut(state, window_id)?.rect;
             if !focus_window_internal(state, window_id) {
@@ -689,6 +734,7 @@ pub fn reduce_desktop(
             pointer,
             viewport,
         } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let previous_focus = state.focused_window_id();
             let rect_start = find_window_mut(state, window_id)?.rect;
             if !focus_window_internal(state, window_id) {
@@ -720,6 +766,7 @@ pub fn reduce_desktop(
             effects.push(RuntimeEffect::PersistLayout);
         }
         DesktopAction::SuspendWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let should_emit = {
                 let window = find_window_mut(state, window_id)?;
                 if window.suspended {
@@ -739,6 +786,7 @@ pub fn reduce_desktop(
             }
         }
         DesktopAction::ResumeWindow { window_id } => {
+            ensure_modal_allows_target(state, Some(window_id))?;
             let should_emit = {
                 let window = find_window_mut(state, window_id)?;
                 if window.suspended {
@@ -765,8 +813,18 @@ pub fn reduce_desktop(
                 .map(|w| w.app_id.clone())
                 .ok_or(ReducerError::WindowNotFound)?;
             if let Some(required) = command_required_capability(&command) {
-                if !command_allowed_for_app(&source_app_id, required) {
-                    return Ok(effects);
+                if !command_allowed_for_app(state, &source_app_id, required) {
+                    return Err(ReducerError::CapabilityDenied {
+                        app_id: source_app_id.to_string(),
+                        capability: required,
+                        window_id,
+                        diagnostic_event: Box::new(AppEvent::capability_denied(
+                            source_app_id.to_string(),
+                            required,
+                            window_id.0,
+                            command_label(&command),
+                        )),
+                    });
                 }
             }
 
@@ -986,38 +1044,42 @@ pub fn reduce_desktop(
             state.app_shared_state.insert(storage_key, shared);
             effects.push(RuntimeEffect::PersistLayout);
         }
-        DesktopAction::HydrateSnapshot { snapshot } => {
-            let max_restore = state.preferences.max_restore_windows;
+        DesktopAction::HydrateSnapshot { snapshot, mode } => {
             let theme = state.theme.clone();
             let wallpaper_config = state.wallpaper.clone();
             let wallpaper_preview = state.wallpaper_preview.clone();
             let wallpaper_library = state.wallpaper_library.clone();
+            let privileged_app_ids = state.privileged_app_ids.clone();
             *state = DesktopState::from_snapshot(snapshot);
             state.theme = theme;
             state.wallpaper = wallpaper_config;
             state.wallpaper_preview = wallpaper_preview;
             state.wallpaper_library = wallpaper_library;
+            state.privileged_app_ids = privileged_app_ids;
+            let max_restore = state.preferences.max_restore_windows;
             if state.windows.len() > max_restore {
                 state.windows.truncate(max_restore);
             }
             normalize_window_stack(state);
-            for window in state.windows.iter_mut() {
-                if window.last_lifecycle_event.is_none() {
-                    window.last_lifecycle_event =
-                        Some(AppLifecycleEvent::Mounted.token().to_string());
+            if matches!(mode, HydrationMode::BootRestore) {
+                for window in state.windows.iter_mut() {
+                    record_window_lifecycle_by_id(window, AppLifecycleEvent::Mounted);
+                    effects.push(RuntimeEffect::DispatchLifecycle {
+                        window_id: window.id,
+                        event: AppLifecycleEvent::Mounted,
+                    });
                 }
-                effects.push(RuntimeEffect::DispatchLifecycle {
-                    window_id: window.id,
-                    event: AppLifecycleEvent::Mounted,
-                });
+                if let Some(focused) = state.focused_window_id() {
+                    record_window_lifecycle(state, focused, AppLifecycleEvent::Focused);
+                    effects.push(RuntimeEffect::DispatchLifecycle {
+                        window_id: focused,
+                        event: AppLifecycleEvent::Focused,
+                    });
+                }
             }
-            if let Some(focused) = state.focused_window_id() {
-                record_window_lifecycle(state, focused, AppLifecycleEvent::Focused);
-                effects.push(RuntimeEffect::DispatchLifecycle {
-                    window_id: focused,
-                    event: AppLifecycleEvent::Focused,
-                });
-            }
+        }
+        DesktopAction::HydratePolicyOverlay { privileged_app_ids } => {
+            state.privileged_app_ids = privileged_app_ids.into_iter().collect();
         }
         DesktopAction::ApplyDeepLink { deep_link } => {
             effects.push(RuntimeEffect::ParseAndOpenDeepLink(deep_link));
@@ -1051,6 +1113,7 @@ pub fn build_open_request_from_deeplink(target: DeepLinkOpenTarget) -> OpenWindo
     match target {
         DeepLinkOpenTarget::App(app_id) => OpenWindowRequest::new(app_id),
         DeepLinkOpenTarget::NotesSlug(slug) => {
+            // Notes deep links remain a compatibility route into the Settings experience.
             let mut req = OpenWindowRequest::new(apps::settings_application_id());
             req.title = Some(format!("Settings - Notes {slug}"));
             req.persist_key = Some(format!("notes:{slug}"));
@@ -1058,6 +1121,7 @@ pub fn build_open_request_from_deeplink(target: DeepLinkOpenTarget) -> OpenWindo
             req
         }
         DeepLinkOpenTarget::ProjectSlug(slug) => {
+            // Project deep links remain a compatibility route into Control Center.
             let mut req = OpenWindowRequest::new(ApplicationId::trusted("system.control-center"));
             req.title = Some(format!("Project - {slug}"));
             req.persist_key = Some(format!("projects:{slug}"));
@@ -1107,8 +1171,12 @@ fn record_window_lifecycle(
     event: AppLifecycleEvent,
 ) {
     if let Some(window) = state.windows.iter_mut().find(|w| w.id == window_id) {
-        window.last_lifecycle_event = Some(event.token().to_string());
+        record_window_lifecycle_by_id(window, event);
     }
+}
+
+fn record_window_lifecycle_by_id(window: &mut WindowRecord, event: AppLifecycleEvent) {
+    window.last_lifecycle_event = Some(event.token().to_string());
 }
 
 fn emit_focus_transition(
@@ -1173,11 +1241,114 @@ fn command_required_capability(command: &AppCommand) -> Option<AppCapability> {
     }
 }
 
-fn command_allowed_for_app(app_id: &ApplicationId, required: AppCapability) -> bool {
-    if apps::app_is_privileged_by_id(app_id) {
-        return true;
+fn command_allowed_for_app(
+    state: &DesktopState,
+    app_id: &ApplicationId,
+    required: AppCapability,
+) -> bool {
+    apps::resolved_capabilities(state, app_id).contains(&required)
+}
+
+fn active_modal_window(state: &DesktopState) -> Option<&WindowRecord> {
+    let active_modal = state.active_modal?;
+    state
+        .windows
+        .iter()
+        .find(|window| window.id == active_modal)
+}
+
+fn begin_modal_open(
+    state: &mut DesktopState,
+    incoming_window_id: WindowId,
+    req: &OpenWindowRequest,
+) -> Result<(), ReducerError> {
+    let modal_parent = req.flags.modal_parent;
+    if let Some(active_modal) = active_modal_window(state) {
+        return Err(ReducerError::ModalBlocked {
+            active_modal: active_modal.id,
+        });
     }
-    apps::app_requested_capabilities_by_id(app_id).contains(&required)
+
+    if let Some(parent_id) = modal_parent {
+        if !state.windows.iter().any(|window| window.id == parent_id) {
+            return Err(ReducerError::WindowNotFound);
+        }
+        state.active_modal = Some(incoming_window_id);
+    }
+
+    Ok(())
+}
+
+fn ensure_modal_allows_target(
+    state: &DesktopState,
+    target_window_id: Option<WindowId>,
+) -> Result<(), ReducerError> {
+    let Some(active_modal) = active_modal_window(state) else {
+        return Ok(());
+    };
+    if Some(active_modal.id) == target_window_id {
+        return Ok(());
+    }
+
+    Err(ReducerError::ModalBlocked {
+        active_modal: active_modal.id,
+    })
+}
+
+fn complete_modal_close(state: &mut DesktopState, closed_window_id: WindowId) -> Option<WindowId> {
+    let active_modal = active_modal_window(state)?;
+    if active_modal.id != closed_window_id {
+        return None;
+    }
+
+    let parent_id = active_modal.flags.modal_parent;
+    state.active_modal = None;
+    parent_id.filter(|parent_id| state.windows.iter().any(|window| window.id == *parent_id))
+}
+
+fn ensure_parent_close_allowed(
+    state: &DesktopState,
+    parent_window_id: WindowId,
+) -> Result<(), ReducerError> {
+    let Some(active_modal) = active_modal_window(state) else {
+        return Ok(());
+    };
+    if active_modal.flags.modal_parent == Some(parent_window_id) {
+        return Err(ReducerError::ModalBlocked {
+            active_modal: active_modal.id,
+        });
+    }
+
+    Ok(())
+}
+
+fn command_label(command: &AppCommand) -> &'static str {
+    match command {
+        AppCommand::SetWindowTitle { .. } => "set-window-title",
+        AppCommand::PersistState { .. } => "persist-state",
+        AppCommand::PersistSharedState { .. } => "persist-shared-state",
+        AppCommand::SaveConfig { .. } => "save-config",
+        AppCommand::OpenExternalUrl { .. } => "open-external-url",
+        AppCommand::Subscribe { .. } => "subscribe",
+        AppCommand::Unsubscribe { .. } => "unsubscribe",
+        AppCommand::PublishEvent { .. } => "publish-event",
+        AppCommand::PreviewWallpaper { .. } => "preview-wallpaper",
+        AppCommand::ApplyWallpaperPreview => "apply-wallpaper-preview",
+        AppCommand::SetCurrentWallpaper { .. } => "set-current-wallpaper",
+        AppCommand::ClearWallpaperPreview => "clear-wallpaper-preview",
+        AppCommand::ImportWallpaperFromPicker { .. } => "import-wallpaper-from-picker",
+        AppCommand::RenameWallpaperAsset { .. } => "rename-wallpaper-asset",
+        AppCommand::SetWallpaperFavorite { .. } => "set-wallpaper-favorite",
+        AppCommand::SetWallpaperTags { .. } => "set-wallpaper-tags",
+        AppCommand::SetWallpaperCollections { .. } => "set-wallpaper-collections",
+        AppCommand::CreateWallpaperCollection { .. } => "create-wallpaper-collection",
+        AppCommand::RenameWallpaperCollection { .. } => "rename-wallpaper-collection",
+        AppCommand::DeleteWallpaperCollection { .. } => "delete-wallpaper-collection",
+        AppCommand::DeleteWallpaperAsset { .. } => "delete-wallpaper-asset",
+        AppCommand::SetDesktopHighContrast { .. } => "set-desktop-high-contrast",
+        AppCommand::SetDesktopReducedMotion { .. } => "set-desktop-reduced-motion",
+        AppCommand::Notify { .. } => "notify",
+    }
 }
 
 #[cfg(test)]
@@ -1185,7 +1356,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::model::{InteractionState, OpenWindowRequest};
+    use crate::model::{InteractionState, OpenWindowRequest, WindowFlags};
     use desktop_app_contract::ApplicationId;
     use platform_host::{WallpaperDisplayMode, WallpaperSelection};
 
@@ -1826,6 +1997,425 @@ mod tests {
                 correlation_id: None,
                 reply_to: None,
             }]
+        );
+    }
+
+    #[test]
+    fn hydrate_snapshot_uses_restored_restore_limit() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let mut snapshot = DesktopState::default().snapshot();
+        snapshot.preferences.max_restore_windows = 1;
+        snapshot.windows = vec![
+            WindowRecord {
+                id: WindowId(1),
+                app_id: ApplicationId::trusted("system.control-center"),
+                title: "Control Center".to_string(),
+                icon_id: "home".to_string(),
+                rect: WindowRect::default(),
+                restore_rect: None,
+                z_index: 1,
+                is_focused: true,
+                minimized: false,
+                maximized: false,
+                suspended: false,
+                flags: WindowFlags::default(),
+                persist_key: None,
+                app_state: Value::Null,
+                launch_params: Value::Null,
+                last_lifecycle_event: None,
+            },
+            WindowRecord {
+                id: WindowId(2),
+                app_id: ApplicationId::trusted("system.settings"),
+                title: "Settings".to_string(),
+                icon_id: "settings".to_string(),
+                rect: WindowRect::default(),
+                restore_rect: None,
+                z_index: 2,
+                is_focused: false,
+                minimized: false,
+                maximized: false,
+                suspended: false,
+                flags: WindowFlags::default(),
+                persist_key: None,
+                app_state: Value::Null,
+                launch_params: Value::Null,
+                last_lifecycle_event: None,
+            },
+        ];
+        state.preferences.max_restore_windows = 5;
+
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HydrateSnapshot {
+                snapshot,
+                mode: HydrationMode::BootRestore,
+            },
+        )
+        .expect("hydrate snapshot");
+
+        assert_eq!(state.windows.len(), 1);
+        assert_eq!(state.windows[0].id, WindowId(1));
+    }
+
+    #[test]
+    fn sync_hydration_does_not_replay_mount_lifecycle_effects() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let mut snapshot = DesktopState::default().snapshot();
+        snapshot.windows = vec![WindowRecord {
+            id: WindowId(1),
+            app_id: ApplicationId::trusted("system.control-center"),
+            title: "Control Center".to_string(),
+            icon_id: "home".to_string(),
+            rect: WindowRect::default(),
+            restore_rect: None,
+            z_index: 1,
+            is_focused: true,
+            minimized: false,
+            maximized: false,
+            suspended: false,
+            flags: WindowFlags::default(),
+            persist_key: None,
+            app_state: Value::Null,
+            launch_params: Value::Null,
+            last_lifecycle_event: Some(AppLifecycleEvent::Focused.token().to_string()),
+        }];
+
+        let effects = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HydrateSnapshot {
+                snapshot,
+                mode: HydrationMode::SyncRefresh,
+            },
+        )
+        .expect("sync hydrate");
+
+        assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn active_modal_blocks_non_modal_focus_transitions() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let other = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.control-center"),
+        );
+        let mut modal_request = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        modal_request.flags.modal_parent = Some(parent);
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(modal_request),
+        )
+        .expect("open modal");
+        let modal_id = state.windows.last().expect("modal window").id;
+        assert_eq!(state.active_modal, Some(modal_id));
+
+        let err = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::FocusWindow { window_id: other },
+        )
+        .expect_err("modal should block focus");
+        assert!(matches!(
+            err,
+            ReducerError::ModalBlocked { active_modal } if active_modal == modal_id
+        ));
+    }
+
+    #[test]
+    fn opening_modal_child_sets_active_modal() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let mut modal_request = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        modal_request.flags.modal_parent = Some(parent);
+
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(modal_request),
+        )
+        .expect("open modal child");
+
+        let modal = state.windows.last().expect("modal window");
+        assert_eq!(state.active_modal, Some(modal.id));
+        assert_eq!(modal.flags.modal_parent, Some(parent));
+        assert_eq!(state.focused_window_id(), Some(modal.id));
+    }
+
+    #[test]
+    fn active_modal_blocks_new_non_modal_window_opens() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let mut modal_request = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        modal_request.flags.modal_parent = Some(parent);
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(modal_request),
+        )
+        .expect("open modal");
+        let modal_id = state.active_modal.expect("active modal");
+
+        let err = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(OpenWindowRequest::new(ApplicationId::trusted(
+                "system.control-center",
+            ))),
+        )
+        .expect_err("modal should block unrelated open");
+
+        assert!(matches!(
+            err,
+            ReducerError::ModalBlocked { active_modal } if active_modal == modal_id
+        ));
+    }
+
+    #[test]
+    fn active_modal_blocks_new_modal_window_opens() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let mut first_modal = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        first_modal.flags.modal_parent = Some(parent);
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(first_modal),
+        )
+        .expect("open first modal");
+        let active_modal = state.active_modal.expect("active modal");
+
+        let mut second_modal = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        second_modal.flags.modal_parent = Some(parent);
+        let err = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(second_modal),
+        )
+        .expect_err("active modal should block second modal");
+
+        assert!(matches!(
+            err,
+            ReducerError::ModalBlocked { active_modal: blocked } if blocked == active_modal
+        ));
+    }
+
+    #[test]
+    fn closing_active_modal_clears_active_modal_and_focuses_parent() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let mut modal_request = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        modal_request.flags.modal_parent = Some(parent);
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(modal_request),
+        )
+        .expect("open modal");
+        let modal_id = state.active_modal.expect("active modal");
+
+        let effects = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::CloseWindow {
+                window_id: modal_id,
+            },
+        )
+        .expect("close modal");
+
+        assert!(state.active_modal.is_none());
+        assert_eq!(state.focused_window_id(), Some(parent));
+        assert!(!state.windows.iter().any(|window| window.id == modal_id));
+        assert!(effects.contains(&RuntimeEffect::FocusWindowInput(parent)));
+    }
+
+    #[test]
+    fn closing_modal_parent_while_child_is_active_is_rejected() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let parent = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.settings"),
+        );
+        let mut modal_request = OpenWindowRequest::new(ApplicationId::trusted("system.settings"));
+        modal_request.flags.modal_parent = Some(parent);
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::OpenWindow(modal_request),
+        )
+        .expect("open modal");
+        let modal_id = state.active_modal.expect("active modal");
+
+        let err = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::CloseWindow { window_id: parent },
+        )
+        .expect_err("modal parent close should be blocked");
+
+        assert!(matches!(
+            err,
+            ReducerError::ModalBlocked { active_modal } if active_modal == modal_id
+        ));
+    }
+
+    #[test]
+    fn policy_overlay_grants_privileged_command_access() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let terminal = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.terminal"),
+        );
+
+        let denied = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HandleAppCommand {
+                window_id: terminal,
+                command: AppCommand::OpenExternalUrl {
+                    url: "https://example.com".to_string(),
+                },
+            },
+        )
+        .expect_err("terminal should not have external-url access by default");
+        assert!(matches!(denied, ReducerError::CapabilityDenied { .. }));
+
+        reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HydratePolicyOverlay {
+                privileged_app_ids: vec!["system.terminal".to_string()],
+            },
+        )
+        .expect("hydrate policy overlay");
+
+        let effects = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HandleAppCommand {
+                window_id: terminal,
+                command: AppCommand::OpenExternalUrl {
+                    url: "https://example.com".to_string(),
+                },
+            },
+        )
+        .expect("overlay should authorize command");
+        assert_eq!(
+            effects,
+            vec![RuntimeEffect::OpenExternalUrl(
+                "https://example.com".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn capability_denial_returns_stable_diagnostic_event() {
+        let mut state = DesktopState::default();
+        let mut interaction = InteractionState::default();
+        let terminal = open(
+            &mut state,
+            &mut interaction,
+            ApplicationId::trusted("system.terminal"),
+        );
+
+        let err = reduce_desktop(
+            &mut state,
+            &mut interaction,
+            DesktopAction::HandleAppCommand {
+                window_id: terminal,
+                command: AppCommand::OpenExternalUrl {
+                    url: "https://example.com".to_string(),
+                },
+            },
+        )
+        .expect_err("terminal should not have external-url access by default");
+
+        match err {
+            ReducerError::CapabilityDenied {
+                app_id,
+                capability,
+                window_id,
+                diagnostic_event,
+            } => {
+                assert_eq!(app_id, "system.terminal");
+                assert_eq!(capability, AppCapability::ExternalUrl);
+                assert_eq!(window_id, terminal);
+                assert_eq!(
+                    diagnostic_event,
+                    Box::new(AppEvent::capability_denied(
+                        "system.terminal",
+                        AppCapability::ExternalUrl,
+                        terminal.0,
+                        "open-external-url",
+                    ))
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn notes_deeplink_resolves_to_settings_compatibility_route() {
+        let request =
+            build_open_request_from_deeplink(DeepLinkOpenTarget::NotesSlug("roadmap".to_string()));
+
+        assert_eq!(request.app_id, apps::settings_application_id());
+        assert_eq!(request.persist_key.as_deref(), Some("notes:roadmap"));
+        assert_eq!(
+            request.launch_params,
+            json!({ "section": "personalize", "note_slug": "roadmap" })
+        );
+    }
+
+    #[test]
+    fn projects_deeplink_resolves_to_control_center_compatibility_route() {
+        let request =
+            build_open_request_from_deeplink(DeepLinkOpenTarget::ProjectSlug("alpha".to_string()));
+
+        assert_eq!(
+            request.app_id,
+            ApplicationId::trusted("system.control-center")
+        );
+        assert_eq!(request.persist_key.as_deref(), Some("projects:alpha"));
+        assert_eq!(
+            request.launch_params,
+            json!({ "section": "overview", "project_slug": "alpha" })
         );
     }
 }

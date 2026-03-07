@@ -74,9 +74,10 @@ pub fn ControlCenterApp(
         }
     }
 
+    let state_service = services.state.clone();
     create_effect(move |_| {
         if let Ok(serialized) = serde_json::to_value(state.get()) {
-            services.state.persist_window_state(serialized);
+            state_service.persist_window_state(serialized);
         }
     });
 

@@ -1,7 +1,7 @@
 //! Desktop runtime persistence adapters for boot hydration and lightweight local preferences.
 
 use crate::host::DesktopHostContext;
-use crate::model::{DesktopSnapshot, DesktopState, DesktopTheme};
+use crate::model::{DesktopPreferences, DesktopSnapshot, DesktopState, DesktopTheme};
 #[cfg(test)]
 use platform_host::build_app_state_envelope;
 use platform_host::{
@@ -40,8 +40,6 @@ struct LegacyDesktopSnapshotV1 {
     theme: LegacyThemePayload,
     preferences: crate::model::DesktopPreferences,
     windows: Vec<crate::model::WindowRecord>,
-    last_explorer_path: Option<String>,
-    last_notepad_slug: Option<String>,
     terminal_history: Vec<String>,
     #[serde(default)]
     app_shared_state: std::collections::BTreeMap<String, serde_json::Value>,
@@ -59,8 +57,6 @@ fn migrate_desktop_snapshot(
                 schema_version: crate::model::DESKTOP_LAYOUT_SCHEMA_VERSION,
                 preferences: legacy.preferences,
                 windows: legacy.windows,
-                last_explorer_path: legacy.last_explorer_path,
-                last_notepad_slug: legacy.last_notepad_slug,
                 terminal_history: legacy.terminal_history,
                 app_shared_state: legacy.app_shared_state,
             }))
@@ -103,8 +99,6 @@ pub async fn load_boot_snapshot(_host: &DesktopHostContext) -> Option<DesktopSna
                 schema_version: crate::model::DESKTOP_LAYOUT_SCHEMA_VERSION,
                 preferences: Default::default(),
                 windows: Vec::new(),
-                last_explorer_path: None,
-                last_notepad_slug: None,
                 terminal_history: history,
                 app_shared_state: Default::default(),
             }),
@@ -135,6 +129,17 @@ pub async fn load_durable_boot_snapshot(host: &DesktopHostContext) -> Option<Des
             None
         }
     }
+}
+
+/// Resolves restore preferences from the most authoritative available snapshot.
+pub fn resolve_restore_preferences(
+    durable_snapshot: Option<&DesktopSnapshot>,
+    legacy_snapshot: Option<&DesktopSnapshot>,
+) -> DesktopPreferences {
+    durable_snapshot
+        .or(legacy_snapshot)
+        .map(|snapshot| snapshot.preferences.clone())
+        .unwrap_or_default()
 }
 
 /// Persists a durable desktop layout snapshot through the configured
@@ -187,7 +192,6 @@ pub async fn load_theme(host: &DesktopHostContext) -> Option<DesktopTheme> {
         Ok(None) => load_legacy_theme(host).await.map(|legacy| DesktopTheme {
             high_contrast: legacy.high_contrast,
             reduced_motion: legacy.reduced_motion,
-            audio_enabled: legacy.audio_enabled,
         }),
         Err(err) => {
             leptos::logging::warn!("desktop theme load failed: {err}");
@@ -291,5 +295,22 @@ mod tests {
         let migrated =
             migrate_desktop_snapshot(0, &envelope).expect("schema-zero migration should succeed");
         assert!(migrated.is_some(), "expected migrated desktop snapshot");
+    }
+
+    #[test]
+    fn restore_preferences_prefer_durable_snapshot_then_legacy() {
+        let mut legacy = DesktopState::default().snapshot();
+        legacy.preferences.restore_on_boot = false;
+
+        let mut durable = DesktopState::default().snapshot();
+        durable.preferences.restore_on_boot = true;
+        durable.preferences.max_restore_windows = 2;
+
+        let resolved = resolve_restore_preferences(Some(&durable), Some(&legacy));
+        assert!(resolved.restore_on_boot);
+        assert_eq!(resolved.max_restore_windows, 2);
+
+        let legacy_only = resolve_restore_preferences(None, Some(&legacy));
+        assert!(!legacy_only.restore_on_boot);
     }
 }

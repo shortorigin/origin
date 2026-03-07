@@ -90,6 +90,6 @@ pub use platform_host::{
     WallpaperMediaKind, WallpaperPosition, WallpaperSelection, WallpaperSourceKind,
 };
 /// Re-exported reducer entrypoint and core action/effect enums.
-pub use reducer::{reduce_desktop, DesktopAction, RuntimeEffect};
+pub use reducer::{reduce_desktop, DesktopAction, HydrationMode, RuntimeEffect};
 /// Re-exported shared UI primitives for runtime-owned shell surfaces.
 pub use system_ui::prelude::{Icon, IconName, IconSize};

@@ -1,6 +1,6 @@
 //! Core runtime data model, window geometry, persistence snapshots, and deep-link types.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use desktop_app_contract::ApplicationId;
 use platform_host::{WallpaperConfig, WallpaperLibrarySnapshot};
@@ -141,7 +141,7 @@ pub struct WindowRecord {
     /// Launch parameters provided to the app component.
     pub launch_params: Value,
     /// Last lifecycle token observed for this window.
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub last_lifecycle_event: Option<String>,
 }
 
@@ -157,13 +157,6 @@ pub struct DesktopTheme {
     /// Whether reduced motion rendering is enabled.
     #[serde(default)]
     pub reduced_motion: bool,
-    /// Whether desktop sound effects are enabled.
-    #[serde(default = "default_audio_enabled")]
-    pub audio_enabled: bool,
-}
-
-const fn default_audio_enabled() -> bool {
-    true
 }
 
 /// Current committed desktop wallpaper configuration.
@@ -211,10 +204,6 @@ pub struct DesktopState {
     pub wallpaper_library: WallpaperLibrarySnapshot,
     /// Runtime/user preferences.
     pub preferences: DesktopPreferences,
-    /// Last explorer path used by shell shortcuts/workflows.
-    pub last_explorer_path: Option<String>,
-    /// Last notepad slug used by shell shortcuts/workflows.
-    pub last_notepad_slug: Option<String>,
     /// Recent terminal commands captured for history.
     pub terminal_history: Vec<String>,
     /// App-shared state payloads keyed by `<app_id>:<key>`.
@@ -223,6 +212,9 @@ pub struct DesktopState {
     /// Whether asynchronous boot hydration has completed for the current runtime session.
     #[serde(skip)]
     pub boot_hydrated: bool,
+    /// App ids elevated by the runtime policy overlay for this session.
+    #[serde(skip)]
+    pub privileged_app_ids: BTreeSet<String>,
 }
 
 impl Default for DesktopState {
@@ -239,11 +231,10 @@ impl Default for DesktopState {
                 &WallpaperLibrarySnapshot::default(),
             ),
             preferences: DesktopPreferences::default(),
-            last_explorer_path: None,
-            last_notepad_slug: None,
             terminal_history: Vec::new(),
             app_shared_state: BTreeMap::new(),
             boot_hydrated: false,
+            privileged_app_ids: BTreeSet::new(),
         }
     }
 }
@@ -260,8 +251,6 @@ impl DesktopState {
             schema_version: DESKTOP_LAYOUT_SCHEMA_VERSION,
             preferences: self.preferences.clone(),
             windows: self.windows.clone(),
-            last_explorer_path: self.last_explorer_path.clone(),
-            last_notepad_slug: self.last_notepad_slug.clone(),
             terminal_history: self.terminal_history.clone(),
             app_shared_state: self.app_shared_state.clone(),
         }
@@ -274,8 +263,6 @@ impl DesktopState {
         let mut state = Self::default();
         state.preferences = snapshot.preferences;
         state.windows = snapshot.windows;
-        state.last_explorer_path = snapshot.last_explorer_path;
-        state.last_notepad_slug = snapshot.last_notepad_slug;
         state.terminal_history = snapshot.terminal_history;
         state.app_shared_state = snapshot.app_shared_state;
         state.boot_hydrated = false;
@@ -299,10 +286,6 @@ pub struct DesktopSnapshot {
     pub preferences: DesktopPreferences,
     /// Persisted open window records.
     pub windows: Vec<WindowRecord>,
-    /// Persisted explorer path hint.
-    pub last_explorer_path: Option<String>,
-    /// Persisted notepad slug hint.
-    pub last_notepad_slug: Option<String>,
     /// Persisted terminal history lines.
     pub terminal_history: Vec<String>,
     /// Persisted app-shared state payloads.
@@ -435,9 +418,9 @@ pub struct InteractionState {
 pub enum DeepLinkOpenTarget {
     /// Open an app by id.
     App(ApplicationId),
-    /// Open a notepad window for a note slug.
+    /// Open the shell's note-focused compatibility route for a note slug.
     NotesSlug(String),
-    /// Open an explorer window scoped to a project slug.
+    /// Open the shell's project-focused compatibility route for a project slug.
     ProjectSlug(String),
 }
 
@@ -514,12 +497,10 @@ mod tests {
         let theme = DesktopTheme {
             high_contrast: false,
             reduced_motion: true,
-            audio_enabled: true,
         };
         let encoded = serde_json::to_value(&theme).expect("serialize theme");
         let decoded: DesktopTheme = serde_json::from_value(encoded).expect("deserialize theme");
         assert!(decoded.reduced_motion);
-        assert!(decoded.audio_enabled);
     }
 
     #[test]
@@ -565,13 +546,50 @@ mod tests {
                     last_lifecycle_event: Some("focused".to_string()),
                 },
             ],
-            last_explorer_path: None,
-            last_notepad_slug: None,
             terminal_history: Vec::new(),
             app_shared_state: BTreeMap::new(),
         });
 
         assert_eq!(state.next_window_id, 12);
         assert_eq!(state.focused_window_id(), Some(WindowId(11)));
+    }
+
+    #[test]
+    fn snapshot_omits_runtime_only_lifecycle_marker() {
+        let snapshot = DesktopState::from_snapshot(DesktopSnapshot {
+            schema_version: DESKTOP_LAYOUT_SCHEMA_VERSION,
+            preferences: DesktopPreferences::default(),
+            windows: vec![WindowRecord {
+                id: WindowId(1),
+                app_id: ApplicationId::trusted("system.settings"),
+                title: "Settings".to_string(),
+                icon_id: "settings".to_string(),
+                rect: WindowRect::default(),
+                restore_rect: None,
+                z_index: 1,
+                is_focused: true,
+                minimized: false,
+                maximized: false,
+                suspended: false,
+                flags: WindowFlags::default(),
+                persist_key: None,
+                app_state: Value::Null,
+                launch_params: Value::Null,
+                last_lifecycle_event: Some("focused".to_string()),
+            }],
+            terminal_history: Vec::new(),
+            app_shared_state: BTreeMap::new(),
+        })
+        .snapshot();
+
+        let encoded = serde_json::to_value(snapshot).expect("serialize snapshot");
+        let windows = encoded
+            .get("windows")
+            .and_then(Value::as_array)
+            .expect("windows array");
+        assert!(
+            windows[0].get("last_lifecycle_event").is_none(),
+            "snapshot should not persist runtime lifecycle markers"
+        );
     }
 }

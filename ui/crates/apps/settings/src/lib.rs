@@ -124,9 +124,10 @@ pub fn SettingsApp(
         settings_state.update(|state| state.active_section = section);
     }
 
+    let state_service = services.state.clone();
     create_effect(move |_| {
         if let Ok(serialized) = serde_json::to_value(settings_state.get()) {
-            services.state.persist_window_state(serialized);
+            state_service.persist_window_state(serialized);
         }
     });
 

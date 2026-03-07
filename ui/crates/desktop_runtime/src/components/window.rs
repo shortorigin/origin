@@ -314,6 +314,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
     let wallpaper_preview = create_rw_signal(runtime.state.get_untracked().wallpaper_preview);
     let wallpaper_library = create_rw_signal(runtime.state.get_untracked().wallpaper_library);
     let terminal_history = create_rw_signal(runtime.state.get_untracked().terminal_history);
+    let shared_state = create_rw_signal(runtime.state.get_untracked().app_shared_state);
     create_effect(move |_| {
         let desktop = runtime.state.get();
         theme_high_contrast.set(desktop.theme.high_contrast);
@@ -322,6 +323,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         wallpaper_preview.set(desktop.wallpaper_preview);
         wallpaper_library.set(desktop.wallpaper_library);
         terminal_history.set(desktop.terminal_history);
+        shared_state.set(desktop.app_shared_state);
     });
     let command_sender = Callback::new(move |command| {
         spawn_local(async move {
@@ -336,9 +338,17 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         .map(|w| w.app_id.clone())
         .expect("window app id");
     let capabilities = create_rw_signal(CapabilitySet::new(
-        apps::app_requested_capabilities_by_id(&app_id).to_vec(),
+        apps::resolved_capabilities(&state.get_untracked(), &app_id),
         runtime.host.get_value().host_capabilities(),
     ));
+    let capability_app_id = app_id.clone();
+    create_effect(move |_| {
+        let desktop = state.get();
+        capabilities.set(CapabilitySet::new(
+            apps::resolved_capabilities(&desktop, &capability_app_id),
+            runtime.host.get_value().host_capabilities(),
+        ));
+    });
     let platform_dashboard = create_rw_signal(
         InstitutionalPlatformClientV1 {
             client_name: "origin-shell".to_string(),
@@ -360,12 +370,14 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         ),
     );
     let services = store_value(AppServices::new(
+        app_id.clone(),
         command_sender,
         capabilities.get_untracked(),
         runtime.host.get_value().app_state_store(),
         runtime.host.get_value().prefs_store(),
         runtime.host.get_value().explorer_fs_service(),
         runtime.host.get_value().content_cache(),
+        shared_state.read_only(),
         theme_high_contrast.read_only(),
         theme_reduced_motion.read_only(),
         wallpaper_current.read_only(),

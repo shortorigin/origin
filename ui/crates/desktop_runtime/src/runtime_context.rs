@@ -93,7 +93,22 @@ pub fn DesktopProvider(
                     effects.set(queue);
                 }
             }
-            Err(err) => logging::warn!("desktop reducer error: {err}"),
+            Err(err) => {
+                if let crate::reducer::ReducerError::CapabilityDenied {
+                    window_id,
+                    diagnostic_event,
+                    ..
+                } = &err
+                {
+                    let mut queue = effects.get_untracked();
+                    queue.push(RuntimeEffect::DeliverAppEvent {
+                        window_id: *window_id,
+                        event: diagnostic_event.as_ref().clone(),
+                    });
+                    effects.set(queue);
+                }
+                logging::warn!("desktop reducer error: {err}");
+            }
         }
     });
 
