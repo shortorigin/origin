@@ -103,3 +103,7 @@ pub async fn explorer_stat(path: &str) -> Result<ExplorerMetadata, String> {
 pub async fn open_external_url(url: &str) -> Result<(), String> {
     imp::open_external_url(url).await
 }
+
+pub async fn send_notification(title: &str, body: &str) -> Result<(), String> {
+    imp::send_notification(title, body).await
+}

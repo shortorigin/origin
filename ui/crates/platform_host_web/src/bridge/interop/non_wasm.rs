@@ -92,3 +92,7 @@ pub async fn explorer_stat(_path: &str) -> Result<ExplorerMetadata, String> {
 pub async fn open_external_url(_url: &str) -> Result<(), String> {
     Err(unsupported())
 }
+
+pub async fn send_notification(_title: &str, _body: &str) -> Result<(), String> {
+    Err(unsupported())
+}

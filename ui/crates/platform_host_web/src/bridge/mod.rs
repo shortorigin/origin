@@ -100,6 +100,10 @@ pub async fn open_external_url(url: &str) -> Result<(), String> {
     interop::open_external_url(url).await
 }
 
+pub async fn send_notification(title: &str, body: &str) -> Result<(), String> {
+    interop::send_notification(title, body).await
+}
+
 #[cfg(test)]
 mod tests {
     use futures::executor::block_on;

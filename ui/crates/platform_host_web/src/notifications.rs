@@ -1,5 +1,6 @@
 //! Notification host-service adapters for browser and desktop-webview contexts.
 
+use crate::bridge;
 use platform_host::{NotificationFuture, NotificationService};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -45,6 +46,6 @@ impl NotificationService for TauriNotificationService {
         title: &'a str,
         body: &'a str,
     ) -> NotificationFuture<'a, Result<(), String>> {
-        WebNotificationService.notify(title, body)
+        Box::pin(async move { bridge::send_notification(title, body).await })
     }
 }
