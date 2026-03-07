@@ -13,8 +13,6 @@ use platform_host::{
     WallpaperCollectionDeleteResult, WallpaperImportRequest, WallpaperImportResult,
     WallpaperLibrarySnapshot, WallpaperSelection,
 };
-use serde::{de::DeserializeOwned, Serialize};
-
 use crate::{
     TauriAppStateStore, TauriContentCache, TauriExplorerFsService, TauriExternalUrlService,
     TauriNotificationService, TauriPrefsStore, WebAppStateStore, WebContentCache,
@@ -302,30 +300,6 @@ pub enum PrefsStoreAdapter {
 }
 
 impl PrefsStoreAdapter {
-    /// Loads a browser-local typed preference value.
-    ///
-    /// Returns `None` for transport-backed desktop strategies because typed local helpers are only
-    /// available on the browser implementation.
-    pub fn load_typed<T: DeserializeOwned>(self, key: &str) -> Option<T> {
-        match self {
-            Self::Browser(store) => store.load_typed(key),
-            Self::DesktopTauri(_) | Self::DesktopStub(_) => None,
-        }
-    }
-
-    /// Saves a browser-local typed preference value.
-    ///
-    /// Desktop transport strategies accept the call as a no-op because callers should use the
-    /// trait-based async [`PrefsStore`] path for cross-host persistence.
-    pub fn save_typed<T: Serialize>(self, key: &str, value: &T) -> Result<(), String> {
-        match self {
-            Self::Browser(store) => store.save_typed(key, value),
-            Self::DesktopTauri(_) | Self::DesktopStub(_) => {
-                let _ = (key, value);
-                Ok(())
-            }
-        }
-    }
 }
 
 impl PrefsStore for PrefsStoreAdapter {

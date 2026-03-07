@@ -1,0 +1,87 @@
+//! Browser PWA/runtime enhancement helpers.
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+
+#[cfg(target_arch = "wasm32")]
+const SERVICE_WORKER_ASSET: &str = "sw.js";
+
+#[cfg_attr(not(any(test, target_arch = "wasm32")), allow(dead_code))]
+fn public_asset_path(base_path: &str, asset: &str) -> String {
+    let asset = asset.trim_start_matches('/');
+    let base_path = base_path.trim();
+    if base_path.is_empty() || base_path == "/" {
+        format!("/{asset}")
+    } else {
+        format!("{}/{}", base_path.trim_end_matches('/'), asset)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn current_public_base_path() -> Option<String> {
+    let document = web_sys::window()?.document()?;
+    let base_uri = document.base_uri().ok()?;
+    let url = web_sys::Url::new(&base_uri).ok()?;
+    Some(url.pathname())
+}
+
+/// Registers the service worker when the platform supports it.
+pub fn register_service_worker() {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if !platform_host_web::pwa::service_worker_supported() {
+            return;
+        }
+
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let navigator = window.navigator();
+        let Ok(service_worker) = js_sys::Reflect::get(
+            navigator.as_ref(),
+            &wasm_bindgen::JsValue::from_str("serviceWorker"),
+        ) else {
+            return;
+        };
+        let Ok(register) = js_sys::Reflect::get(
+            &service_worker,
+            &wasm_bindgen::JsValue::from_str("register"),
+        ) else {
+            return;
+        };
+        let Some(register_fn) = register.dyn_ref::<js_sys::Function>() else {
+            return;
+        };
+        let Some(base_path) = current_public_base_path() else {
+            return;
+        };
+        let sw_path = public_asset_path(&base_path, SERVICE_WORKER_ASSET);
+        let _ = register_fn.call1(
+            &service_worker,
+            &wasm_bindgen::JsValue::from_str(&sw_path),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::public_asset_path;
+
+    #[test]
+    fn joins_assets_at_root() {
+        assert_eq!(public_asset_path("/", "sw.js"), "/sw.js");
+    }
+
+    #[test]
+    fn joins_assets_under_trunk_public_path() {
+        assert_eq!(public_asset_path("/preview/ui/", "sw.js"), "/preview/ui/sw.js");
+    }
+
+    #[test]
+    fn trims_leading_slashes_from_asset_paths() {
+        assert_eq!(
+            public_asset_path("/preview/ui", "/manifest.webmanifest"),
+            "/preview/ui/manifest.webmanifest"
+        );
+    }
+}

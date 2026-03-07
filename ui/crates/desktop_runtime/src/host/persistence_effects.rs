@@ -1,5 +1,6 @@
 use leptos::{logging, spawn_local, SignalGetUntracked};
 use platform_host::save_pref_with;
+use platform_host_web::{publish_shell_sync_event, ShellSyncEvent};
 
 use crate::{components::DesktopRuntimeContext, host::DesktopHostContext, persistence};
 
@@ -9,6 +10,7 @@ pub(super) fn persist_layout(host: DesktopHostContext, runtime: DesktopRuntimeCo
         logging::warn!("persist layout failed: {err}");
     }
     host.persist_durable_snapshot(snapshot_state, "layout");
+    publish_shell_sync_event(ShellSyncEvent::LayoutChanged);
 }
 
 pub(super) fn persist_theme(host: DesktopHostContext, runtime: DesktopRuntimeContext) {
@@ -20,6 +22,7 @@ pub(super) fn persist_theme(host: DesktopHostContext, runtime: DesktopRuntimeCon
         }
     });
     host.persist_durable_snapshot(runtime.state.get_untracked(), "theme");
+    publish_shell_sync_event(ShellSyncEvent::ThemeChanged);
 }
 
 pub(super) fn persist_wallpaper(host: DesktopHostContext, runtime: DesktopRuntimeContext) {
@@ -29,6 +32,7 @@ pub(super) fn persist_wallpaper(host: DesktopHostContext, runtime: DesktopRuntim
             logging::warn!("persist wallpaper failed: {err}");
         }
     });
+    publish_shell_sync_event(ShellSyncEvent::WallpaperChanged);
 }
 
 pub(super) fn persist_terminal_history(host: DesktopHostContext, runtime: DesktopRuntimeContext) {
