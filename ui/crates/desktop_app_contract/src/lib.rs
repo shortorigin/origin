@@ -14,10 +14,10 @@
 
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, collections::BTreeMap, rc::Rc};
 
 use futures::future::LocalBoxFuture;
-use leptos::{Callable, Callback, ReadSignal, RwSignal, View};
+use leptos::{Callable, Callback, ReadSignal, RwSignal, SignalGet, View};
 use platform_host::{
     load_app_state_with_migration, load_pref_with, save_app_state_with, save_pref_with,
     AppStateEnvelope, AppStateStore, CapabilityStatus, ContentCache, ExplorerBackendStatus,
@@ -248,6 +248,23 @@ impl AppLifecycleEvent {
     }
 }
 
+impl AppCapability {
+    /// Returns the stable kebab-case token for this capability.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Window => "window",
+            Self::State => "state",
+            Self::Config => "config",
+            Self::Theme => "theme",
+            Self::Wallpaper => "wallpaper",
+            Self::Notifications => "notifications",
+            Self::Ipc => "ipc",
+            Self::ExternalUrl => "external-url",
+            Self::Commands => "commands",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// Typed IPC envelope delivered through runtime-managed app inbox channels.
 pub struct AppEvent {
@@ -293,6 +310,31 @@ impl AppEvent {
         self.correlation_id = correlation_id;
         self.reply_to = reply_to;
         self
+    }
+
+    /// Creates a stable capability-denied diagnostic event delivered back to the source window.
+    pub fn capability_denied(
+        app_id: impl Into<String>,
+        capability: AppCapability,
+        window_id: WindowRuntimeId,
+        command: impl Into<String>,
+    ) -> Self {
+        let app_id = app_id.into();
+        Self {
+            schema_version: 1,
+            topic: "system.shell.capability-denied.v1".to_string(),
+            payload: serde_json::json!({
+                "app_id": app_id,
+                "capability": capability.as_str(),
+                "window_id": window_id,
+                "command": command.into(),
+            }),
+            correlation_id: None,
+            reply_to: None,
+            source_app_id: Some(app_id),
+            source_window_id: Some(window_id),
+            timestamp_unix_ms: None,
+        }
     }
 }
 
@@ -467,10 +509,12 @@ impl WindowService {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 /// State persistence service for window and app-shared state channels.
 pub struct StateService {
     sender: Callback<AppCommand>,
+    app_id: ApplicationId,
+    shared_state: ReadSignal<BTreeMap<String, Value>>,
 }
 
 impl StateService {
@@ -485,6 +529,12 @@ impl StateService {
             key: key.into(),
             state,
         });
+    }
+
+    /// Loads app-shared state previously persisted under `key`.
+    pub fn load_shared_state(&self, key: &str) -> Option<Value> {
+        let storage_key = format!("{}:{}", self.app_id.as_str(), key.trim());
+        self.shared_state.get().get(&storage_key).cloned()
     }
 }
 
@@ -1233,12 +1283,14 @@ impl AppServices {
     /// Creates service handles from the runtime command callback and host-selected adapters.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        app_id: ApplicationId,
         sender: Callback<AppCommand>,
         capabilities: CapabilitySet,
         app_state: Rc<dyn AppStateStore>,
         prefs: Rc<dyn PrefsStore>,
         explorer: Rc<dyn ExplorerFsService>,
         cache: Rc<dyn ContentCache>,
+        shared_state: ReadSignal<BTreeMap<String, Value>>,
         theme_high_contrast: ReadSignal<bool>,
         theme_reduced_motion: ReadSignal<bool>,
         wallpaper_current: ReadSignal<WallpaperConfig>,
@@ -1250,7 +1302,11 @@ impl AppServices {
         Self {
             capabilities,
             window: WindowService { sender },
-            state: StateService { sender },
+            state: StateService {
+                sender,
+                app_id,
+                shared_state,
+            },
             config: ConfigService {
                 sender,
                 prefs: prefs.clone(),
@@ -1355,6 +1411,8 @@ pub struct AppRegistration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use leptos::{create_runtime, create_rw_signal};
+    use std::collections::BTreeMap;
 
     #[test]
     fn application_id_requires_dotted_namespaces() {
@@ -1400,5 +1458,51 @@ mod tests {
     #[test]
     fn primary_input_dom_id_uses_window_id() {
         assert_eq!(window_primary_input_dom_id(42), "window-primary-input-42");
+    }
+
+    #[test]
+    fn state_service_loads_shared_state_for_current_app() {
+        let runtime = create_runtime();
+        let sender = Callback::new(|_: AppCommand| {});
+        let shared_state = create_rw_signal(BTreeMap::from([(
+            "system.settings:appearance".to_string(),
+            serde_json::json!({ "tab": "wallpaper" }),
+        )]));
+        let service = StateService {
+            sender,
+            app_id: ApplicationId::trusted("system.settings"),
+            shared_state: shared_state.read_only(),
+        };
+
+        assert_eq!(
+            service.load_shared_state("appearance"),
+            Some(serde_json::json!({ "tab": "wallpaper" }))
+        );
+        assert_eq!(service.load_shared_state("missing"), None);
+
+        runtime.dispose();
+    }
+
+    #[test]
+    fn capability_denied_event_uses_stable_topic_and_payload() {
+        let event = AppEvent::capability_denied(
+            "system.terminal",
+            AppCapability::ExternalUrl,
+            7,
+            "open-external-url",
+        );
+
+        assert_eq!(event.topic, "system.shell.capability-denied.v1");
+        assert_eq!(event.source_app_id.as_deref(), Some("system.terminal"));
+        assert_eq!(event.source_window_id, Some(7));
+        assert_eq!(
+            event.payload,
+            serde_json::json!({
+                "app_id": "system.terminal",
+                "capability": "external-url",
+                "window_id": 7,
+                "command": "open-external-url",
+            })
+        );
     }
 }

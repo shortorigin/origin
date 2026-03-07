@@ -2,7 +2,7 @@
 
 use std::sync::OnceLock;
 
-use crate::model::{OpenWindowRequest, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH};
+use crate::model::{DesktopState, OpenWindowRequest, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH};
 use desktop_app_contract::{
     AppCapability, AppModule, AppMountContext, ApplicationId, SuspendPolicy,
 };
@@ -15,6 +15,17 @@ use system_ui::primitives::IconName;
 const APP_ID_CONTROL_CENTER: &str = "system.control-center";
 const APP_ID_TERMINAL: &str = "system.terminal";
 const APP_ID_SETTINGS: &str = "system.settings";
+const ALL_APP_CAPABILITIES: &[AppCapability] = &[
+    AppCapability::Window,
+    AppCapability::State,
+    AppCapability::Config,
+    AppCapability::Theme,
+    AppCapability::Wallpaper,
+    AppCapability::Notifications,
+    AppCapability::Ipc,
+    AppCapability::ExternalUrl,
+    AppCapability::Commands,
+];
 
 #[derive(Debug, Clone, Copy)]
 struct GeneratedAppManifestMetadata {
@@ -172,6 +183,20 @@ pub fn app_is_privileged_by_id(app_id: &ApplicationId) -> bool {
     BUILTIN_PRIVILEGED_APP_IDS
         .iter()
         .any(|id| *id == app_id.as_str())
+}
+
+/// Returns whether `app_id` is privileged after applying the current runtime policy overlay.
+pub fn app_is_privileged(state: &DesktopState, app_id: &ApplicationId) -> bool {
+    app_is_privileged_by_id(app_id) || state.privileged_app_ids.contains(app_id.as_str())
+}
+
+/// Returns the runtime-effective capabilities for an app after applying privilege policy.
+pub fn resolved_capabilities(state: &DesktopState, app_id: &ApplicationId) -> Vec<AppCapability> {
+    if app_is_privileged(state, app_id) {
+        ALL_APP_CAPABILITIES.to_vec()
+    } else {
+        app_requested_capabilities_by_id(app_id).to_vec()
+    }
 }
 
 /// Parses a canonical or legacy serialized app id into an [`ApplicationId`].

@@ -4,6 +4,7 @@ use desktop_app_contract::{
     AppCapability, AppCommandContext, AppCommandRegistration, ApplicationId,
     CommandRegistrationHandle as AppCommandRegistrationHandle,
 };
+use leptos::SignalGetUntracked;
 use system_shell::CommandExecutionContext;
 use system_shell_contract::{
     CommandDescriptor, CommandNoticeLevel, CommandScope, ShellStreamEvent,
@@ -17,13 +18,13 @@ pub(super) fn register_app_command(
     window_id: WindowId,
     registration: AppCommandRegistration,
 ) -> Result<AppCommandRegistrationHandle, String> {
-    if !app_can_register_commands(&app_id) {
+    if !app_can_register_commands(runtime, &app_id) {
         return Err(format!(
             "{} is not allowed to register system commands",
             app_id.as_str()
         ));
     }
-    validate_scope(&registration.descriptor.scope, &app_id, window_id)?;
+    validate_scope(runtime, &registration.descriptor.scope, &app_id, window_id)?;
     let completion = registration.completion.clone();
     let handler = registration.handler.clone();
     let descriptor = registration.descriptor.clone();
@@ -75,18 +76,21 @@ fn emit_shell_event(context: &CommandExecutionContext, event: ShellStreamEvent) 
     }
 }
 
-fn app_can_register_commands(app_id: &ApplicationId) -> bool {
-    apps::app_is_privileged_by_id(app_id)
-        || apps::app_requested_capabilities_by_id(app_id).contains(&AppCapability::Commands)
+fn app_can_register_commands(runtime: DesktopRuntimeContext, app_id: &ApplicationId) -> bool {
+    let state = runtime.state.get_untracked();
+    apps::app_is_privileged(&state, app_id)
+        || apps::resolved_capabilities(&state, app_id).contains(&AppCapability::Commands)
 }
 
 fn validate_scope(
+    runtime: DesktopRuntimeContext,
     scope: &CommandScope,
     app_id: &ApplicationId,
     window_id: WindowId,
 ) -> Result<(), String> {
+    let state = runtime.state.get_untracked();
     match scope {
-        CommandScope::Global if apps::app_is_privileged_by_id(app_id) => Ok(()),
+        CommandScope::Global if apps::app_is_privileged(&state, app_id) => Ok(()),
         CommandScope::Global => {
             Err("only privileged apps may register global commands".to_string())
         }
