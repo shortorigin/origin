@@ -6,10 +6,12 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+base64 = "0.22.1"
 lattice-config = { path = "../platform/wasmcloud/lattice-config" }
 regex = "1.12.2"
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 toml.workspace = true
 
 [lints]

@@ -1,5 +1,6 @@
 mod delivery;
 mod github;
+mod ui_hardening;
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -51,6 +52,7 @@ fn run() -> Result<(), String> {
         Some("github") => github::run(args.collect()),
         Some("delivery") => delivery::run(args.collect()),
         Some("wasmcloud") => run_wasmcloud(args.collect()),
+        Some("ui-hardening") => ui_hardening::run(args.collect()),
         Some("ui") => run_ui(args.collect()),
         Some("tauri") => run_tauri(args.collect()),
         Some("components") => run_components(args.collect()),

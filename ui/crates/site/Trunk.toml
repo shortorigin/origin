@@ -1,0 +1,14 @@
+[core]
+trunk_version = "0.21.14"
+
+[build]
+target = "index.html"
+dist = "../../../target/trunk-site-dist"
+public_url = "/"
+filehash = true
+inject_scripts = true
+no_sri = false
+
+[serve]
+port = 8080
+open = false
