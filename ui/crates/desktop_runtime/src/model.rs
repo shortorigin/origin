@@ -148,15 +148,55 @@ pub struct WindowRecord {
 /// Fixed baseline shell style id for inspection and app-service parity.
 pub const BASELINE_STYLE_ID: &str = "origin-baseline";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+/// Theme family used for token overrides.
+pub enum ThemeMode {
+    /// Light Deepin-inspired theme.
+    #[default]
+    Light,
+    /// Dark Deepin-inspired theme.
+    Dark,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 /// User-configurable desktop theme preferences.
 pub struct DesktopTheme {
+    /// Active theme family.
+    #[serde(default)]
+    pub mode: ThemeMode,
     /// Whether high contrast rendering is enabled.
     #[serde(default)]
     pub high_contrast: bool,
     /// Whether reduced motion rendering is enabled.
     #[serde(default)]
     pub reduced_motion: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Shell notification record retained in the in-shell center.
+pub struct DesktopNotification {
+    /// Stable notification id.
+    pub id: u64,
+    /// Human-readable notification title.
+    pub title: String,
+    /// Human-readable notification body.
+    pub body: String,
+    /// Optional source application identifier.
+    pub source_app_id: Option<String>,
+    /// Whether the notification is still unread.
+    pub unread: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Visibility state for shell-owned overlays and panels.
+pub struct DesktopPanels {
+    /// Whether the launcher panel is open.
+    pub launcher_open: bool,
+    /// Whether the control center panel is open.
+    pub control_center_open: bool,
+    /// Whether the notification center panel is open.
+    pub notification_center_open: bool,
 }
 
 /// Current committed desktop wallpaper configuration.
@@ -188,10 +228,12 @@ impl Default for DesktopPreferences {
 pub struct DesktopState {
     /// Next window id to assign when opening a window.
     pub next_window_id: u64,
+    /// Next notification id to assign when a shell notification is retained.
+    pub next_notification_id: u64,
     /// Open windows ordered by stacking position.
     pub windows: Vec<WindowRecord>,
-    /// Whether the start menu is currently open.
-    pub start_menu_open: bool,
+    /// Visibility state for shell panels.
+    pub panels: DesktopPanels,
     /// Optional active modal window id.
     pub active_modal: Option<WindowId>,
     /// Current desktop theme.
@@ -206,6 +248,9 @@ pub struct DesktopState {
     pub preferences: DesktopPreferences,
     /// Recent terminal commands captured for history.
     pub terminal_history: Vec<String>,
+    /// Retained notifications shown in the shell notification center.
+    #[serde(default)]
+    pub notifications: Vec<DesktopNotification>,
     /// App-shared state payloads keyed by `<app_id>:<key>`.
     #[serde(default)]
     pub app_shared_state: BTreeMap<String, Value>,
@@ -230,8 +275,9 @@ impl Default for DesktopState {
     fn default() -> Self {
         Self {
             next_window_id: 1,
+            next_notification_id: 1,
             windows: Vec::new(),
-            start_menu_open: false,
+            panels: DesktopPanels::default(),
             active_modal: None,
             theme: DesktopTheme::default(),
             wallpaper: DesktopWallpaperConfig::default(),
@@ -241,6 +287,7 @@ impl Default for DesktopState {
             ),
             preferences: DesktopPreferences::default(),
             terminal_history: Vec::new(),
+            notifications: Vec::new(),
             app_shared_state: BTreeMap::new(),
             boot_hydrated: false,
             privileged_app_ids: BTreeSet::new(),
@@ -252,6 +299,13 @@ impl Default for DesktopState {
 }
 
 impl DesktopState {
+    /// Returns whether any shell-owned launcher or side panel is open.
+    pub fn any_panel_open(&self) -> bool {
+        self.panels.launcher_open
+            || self.panels.control_center_open
+            || self.panels.notification_center_open
+    }
+
     /// Returns the focused window id, if any.
     pub fn focused_window_id(&self) -> Option<WindowId> {
         self.windows.iter().find(|w| w.is_focused).map(|w| w.id)
@@ -551,6 +605,7 @@ mod tests {
 
         let theme: DesktopTheme =
             serde_json::from_value(payload).expect("legacy theme payload should deserialize");
+        assert_eq!(theme.mode, ThemeMode::Light);
         assert!(theme.high_contrast);
         assert!(theme.reduced_motion);
     }
@@ -558,11 +613,13 @@ mod tests {
     #[test]
     fn desktop_theme_roundtrip_preserves_accessibility_flags() {
         let theme = DesktopTheme {
+            mode: ThemeMode::Dark,
             high_contrast: false,
             reduced_motion: true,
         };
         let encoded = serde_json::to_value(&theme).expect("serialize theme");
         let decoded: DesktopTheme = serde_json::from_value(encoded).expect("deserialize theme");
+        assert_eq!(decoded.mode, ThemeMode::Dark);
         assert!(decoded.reduced_motion);
     }
 

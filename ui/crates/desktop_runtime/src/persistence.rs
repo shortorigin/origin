@@ -225,6 +225,7 @@ pub async fn load_theme(host: &DesktopHostContext) -> Option<DesktopTheme> {
     match load_pref_with(host.prefs_store().as_ref(), THEME_KEY).await {
         Ok(Some(theme)) => Some(theme),
         Ok(None) => load_legacy_theme(host).await.map(|legacy| DesktopTheme {
+            mode: Default::default(),
             high_contrast: legacy.high_contrast,
             reduced_motion: legacy.reduced_motion,
         }),

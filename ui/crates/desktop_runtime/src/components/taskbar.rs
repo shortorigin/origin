@@ -1,9 +1,8 @@
 use super::*;
 use leptos::ev::MouseEvent;
 use system_ui::components::{
-    ClockButton as SystemClockButton, SystemTray as SystemTrayList, Taskbar as SystemTaskbar,
-    TaskbarButton as SystemTaskbarButton, TaskbarOverflowButton as SystemTaskbarOverflowButton,
-    TaskbarSection as SystemTaskbarSection, TrayButton as SystemTrayButton,
+    ClockButton as SystemClockButton, Dock as SystemDock, DockButton as SystemDockButton,
+    DockSection as SystemDockSection, SystemTray as SystemTrayList, TrayButton as SystemTrayButton,
 };
 use system_ui::primitives::{Icon, IconName, IconSize};
 
@@ -40,6 +39,78 @@ pub(super) fn Taskbar() -> impl IntoView {
             false,
         )
     });
+    let launcher_open = Signal::derive(move || state.get().panels.launcher_open);
+    let control_center_open = Signal::derive(move || state.get().panels.control_center_open);
+    let notification_center_open =
+        Signal::derive(move || state.get().panels.notification_center_open);
+    let theme_mode = Signal::derive(move || state.get().theme.mode);
+    let high_contrast = Signal::derive(move || state.get().theme.high_contrast);
+    let reduced_motion = Signal::derive(move || state.get().theme.reduced_motion);
+    let open_window_count = Signal::derive(move || state.get().windows.len());
+    let notifications = Signal::derive(move || state.get().notifications.clone());
+    let unread_notification_count = Signal::derive(move || {
+        state
+            .get()
+            .notifications
+            .iter()
+            .filter(|notification| notification.unread)
+            .count()
+    });
+    let close_launcher =
+        Callback::new(move |_| runtime.dispatch_action(DesktopAction::CloseStartMenu));
+    let close_control_center =
+        Callback::new(move |_| runtime.dispatch_action(DesktopAction::CloseControlCenter));
+    let close_notification_center = Callback::new(move |_| {
+        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+    });
+    let activate_launcher_app = Callback::new(move |app_id: ApplicationId| {
+        window_context_menu.set(None);
+        overflow_menu_open.set(false);
+        clock_menu_open.set(false);
+        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+        runtime.dispatch_action(DesktopAction::ActivateApp {
+            app_id,
+            viewport: Some(
+                runtime
+                    .host
+                    .get_value()
+                    .desktop_viewport_rect(TASKBAR_HEIGHT_PX),
+            ),
+        });
+    });
+    let open_settings = Callback::new(move |_| {
+        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+        runtime.dispatch_action(DesktopAction::OpenWindow(browser_e2e_window_request(
+            apps::settings_application_id(),
+            runtime,
+            Value::Null,
+        )));
+    });
+    let toggle_theme_mode = Callback::new(move |_| {
+        let next = if matches!(
+            runtime.state.get_untracked().theme.mode,
+            crate::model::ThemeMode::Dark
+        ) {
+            crate::model::ThemeMode::Light
+        } else {
+            crate::model::ThemeMode::Dark
+        };
+        runtime.dispatch_action(DesktopAction::SetThemeMode { mode: next });
+    });
+    let toggle_high_contrast = Callback::new(move |_| {
+        let enabled = runtime.state.get_untracked().theme.high_contrast;
+        runtime.dispatch_action(DesktopAction::SetHighContrast { enabled: !enabled });
+    });
+    let toggle_reduced_motion = Callback::new(move |_| {
+        let enabled = runtime.state.get_untracked().theme.reduced_motion;
+        runtime.dispatch_action(DesktopAction::SetReducedMotion { enabled: !enabled });
+    });
+    let clear_notifications =
+        Callback::new(move |_| runtime.dispatch_action(DesktopAction::ClearNotifications));
+    let dismiss_notification = Callback::new(move |id| {
+        runtime.dispatch_action(DesktopAction::DismissNotification { id });
+    });
 
     let resize_listener = window_event_listener(ev::resize, move |_| {
         viewport_width.set(
@@ -63,7 +134,7 @@ pub(super) fn Taskbar() -> impl IntoView {
         let had_window_menu = window_context_menu.get_untracked().is_some();
         let had_overflow_menu = overflow_menu_open.get_untracked();
         let had_clock_menu = clock_menu_open.get_untracked();
-        let had_start_menu = runtime.state.get_untracked().start_menu_open;
+        let had_launcher = runtime.state.get_untracked().panels.launcher_open;
 
         if had_window_menu {
             window_context_menu.set(None);
@@ -75,8 +146,19 @@ pub(super) fn Taskbar() -> impl IntoView {
             clock_menu_open.set(false);
         }
 
-        if had_start_menu {
+        if had_launcher {
             runtime.dispatch_action(DesktopAction::CloseStartMenu);
+        }
+        if runtime.state.get_untracked().panels.control_center_open {
+            runtime.dispatch_action(DesktopAction::CloseControlCenter);
+        }
+        if runtime
+            .state
+            .get_untracked()
+            .panels
+            .notification_center_open
+        {
+            runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
         }
     });
     on_cleanup(move || outside_click_listener.remove());
@@ -123,7 +205,7 @@ pub(super) fn Taskbar() -> impl IntoView {
     });
 
     create_effect(move |_| {
-        let is_open = state.get().start_menu_open;
+        let is_open = state.get().panels.launcher_open;
         let was_open = start_menu_was_open.get_untracked();
         if is_open && !was_open {
             start_menu_was_open.set(true);
@@ -236,6 +318,8 @@ pub(super) fn Taskbar() -> impl IntoView {
                         overflow_menu_open.set(false);
                         clock_menu_open.set(false);
                         runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                         let viewport = runtime
                             .host
                             .get_value()
@@ -256,37 +340,38 @@ pub(super) fn Taskbar() -> impl IntoView {
     };
 
     view! {
-        <SystemTaskbar
+        <SystemDock
             role="toolbar"
-            aria_label="Desktop taskbar"
+            aria_label="Desktop dock"
             aria_keyshortcuts="Ctrl+Escape Alt+1 Alt+2 Alt+3 Alt+4 Alt+5 Alt+6 Alt+7 Alt+8 Alt+9"
             on_mousedown=Callback::new(move |ev: MouseEvent| ev.stop_propagation())
             on_keydown=Callback::new(on_taskbar_keydown)
         >
-            <SystemTaskbarSection ui_slot="left">
-                <SystemTaskbarButton
+            <SystemDockSection ui_slot="left">
+                <SystemDockButton
                     id="taskbar-start-button"
-                    ui_slot="start-button"
+                    ui_slot="dock-launcher-button"
                     aria_label="Open application launcher"
                     aria_haspopup="menu"
                     aria_controls="desktop-launcher-menu"
-                    aria_expanded=Signal::derive(move || state.get().start_menu_open)
+                    aria_expanded=launcher_open
                     aria_keyshortcuts="Ctrl+Escape"
                     on_click=Callback::new(move |_| {
                         window_context_menu.set(None);
                         overflow_menu_open.set(false);
                         clock_menu_open.set(false);
+                        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                         runtime.dispatch_action(DesktopAction::ToggleStartMenu);
                     })
                 >
                     <span aria-hidden="true">
-                        <Icon icon=IconName::Launcher size=IconSize::Sm />
+                        <Icon icon=IconName::Launcher size=IconSize::Md />
                     </span>
-                    <span>"Start"</span>
-                </SystemTaskbarButton>
+                </SystemDockButton>
 
                 <Show when=move || taskbar_layout.get().show_pins fallback=|| ()>
-                    <div role="group" aria-label="Pinned apps" data-ui-slot="pinned-apps">
+                    <div role="group" aria-label="Pinned apps" data-ui-slot="dock-pinned-apps">
                         <For
                             each=move || pinned_taskbar_apps().to_vec()
                             key=|app_id| app_id.to_string()
@@ -301,7 +386,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                                 let app_icon_name_value = app_icon_name(&app_id);
                                 let app_data_id = apps::app_icon_id_by_id(&app_id).to_string();
                                 view! {
-                                    <SystemTaskbarButton
+                                    <SystemDockButton
                                         data_app=app_data_id.clone()
                                         title=Signal::derive(move || {
                                             let desktop = state.get();
@@ -330,136 +415,199 @@ pub(super) fn Taskbar() -> impl IntoView {
                                             overflow_menu_open.set(false);
                                             clock_menu_open.set(false);
                                             runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                                            runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                                            runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                                             activate_pinned_taskbar_app(runtime, app_id_for_click.clone());
                                         })
                                     >
                                         <span aria-hidden="true">
                                             <Icon
                                                 icon=app_icon_name_value
-                                                size=IconSize::Sm
+                                                size=IconSize::Md
                                             />
                                         </span>
-                                    </SystemTaskbarButton>
+                                    </SystemDockButton>
                                 }
                             }}
                         </For>
                     </div>
                 </Show>
-            </SystemTaskbarSection>
+            </SystemDockSection>
 
-            <SystemTaskbarSection
+            <SystemDockSection
                 ui_slot="running"
                 role="group"
                 aria_label="Running windows"
             >
-                <div data-ui-slot="running-strip">
-                    <For
-                        each=move || {
-                            let desktop = state.get();
-                            let layout = taskbar_layout.get();
-                            ordered_taskbar_windows(&desktop)
-                                .into_iter()
-                                .take(layout.visible_running_count)
-                                .collect::<Vec<_>>()
-                        }
-                        key=|win| win.id.0
-                        let:win
+                <For
+                    each=move || {
+                        let desktop = state.get();
+                        let layout = taskbar_layout.get();
+                        ordered_taskbar_windows(&desktop)
+                            .into_iter()
+                            .take(layout.visible_running_count)
+                            .collect::<Vec<_>>()
+                    }
+                    key=|win| win.id.0
+                    let:win
+                >
+                    <SystemDockButton
+                        id=taskbar_window_button_dom_id(win.id)
+                        data_app=win.icon_id.clone()
+                        aria_pressed=Signal::derive(move || win.is_focused && !win.minimized)
+                        aria_label=taskbar_window_aria_label(&win)
+                        title=taskbar_window_aria_label(&win)
+                        selected=Signal::derive(move || {
+                            selected_running_window.get() == Some(win.id)
+                        })
+                        pressed=Signal::derive(move || win.is_focused && !win.minimized)
+                        on_click=Callback::new(move |_| {
+                            selected_running_window.set(Some(win.id));
+                            window_context_menu.set(None);
+                            overflow_menu_open.set(false);
+                            clock_menu_open.set(false);
+                            runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                            runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                            runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+                            runtime.dispatch_action(DesktopAction::ToggleTaskbarWindow {
+                                window_id: win.id,
+                            });
+                        })
+                        on_contextmenu=Callback::new(move |ev: MouseEvent| {
+                            ev.prevent_default();
+                            ev.stop_propagation();
+                            selected_running_window.set(Some(win.id));
+                            overflow_menu_open.set(false);
+                            clock_menu_open.set(false);
+                            runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                            runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                            runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+                            open_taskbar_window_context_menu(
+                                runtime.host.get_value(),
+                                window_context_menu,
+                                win.id,
+                                ev.client_x(),
+                                ev.client_y(),
+                            );
+                        })
                     >
-                        <SystemTaskbarButton
-                            id=taskbar_window_button_dom_id(win.id)
-                            data_app=win.icon_id.clone()
-                            aria_pressed=Signal::derive(move || win.is_focused && !win.minimized)
-                            aria_label=taskbar_window_aria_label(&win)
-                            title=taskbar_window_aria_label(&win)
-                            selected=Signal::derive(move || {
-                                selected_running_window.get() == Some(win.id)
-                            })
-                            pressed=Signal::derive(move || win.is_focused && !win.minimized)
+                        <span aria-hidden="true">
+                            <Icon icon=app_icon_name(&win.app_id) size=IconSize::Md />
+                        </span>
+                        <span>{win.title.clone()}</span>
+                    </SystemDockButton>
+                </For>
+
+                <Show
+                    when=move || {
+                        let desktop = state.get();
+                        let running = ordered_taskbar_windows(&desktop);
+                        running.len() > taskbar_layout.get().visible_running_count
+                    }
+                    fallback=|| ()
+                >
+                    <div>
+                        <SystemDockButton
+                            id="taskbar-overflow-button"
+                            ui_slot="dock-overflow-button"
+                            aria_haspopup="menu"
+                            aria_controls="taskbar-overflow-menu"
+                            aria_expanded=overflow_menu_open.read_only()
                             on_click=Callback::new(move |_| {
-                                selected_running_window.set(Some(win.id));
                                 window_context_menu.set(None);
-                                overflow_menu_open.set(false);
                                 clock_menu_open.set(false);
                                 runtime.dispatch_action(DesktopAction::CloseStartMenu);
-                                runtime.dispatch_action(DesktopAction::ToggleTaskbarWindow {
-                                    window_id: win.id,
-                                });
-                            })
-                            on_contextmenu=Callback::new(move |ev: MouseEvent| {
-                                ev.prevent_default();
-                                ev.stop_propagation();
-                                selected_running_window.set(Some(win.id));
-                                overflow_menu_open.set(false);
-                                clock_menu_open.set(false);
-                                runtime.dispatch_action(DesktopAction::CloseStartMenu);
-                                open_taskbar_window_context_menu(
-                                    runtime.host.get_value(),
-                                    window_context_menu,
-                                    win.id,
-                                    ev.client_x(),
-                                    ev.client_y(),
-                                );
+                                runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                                runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+                                overflow_menu_open.update(|open| *open = !*open);
                             })
                         >
                             <span aria-hidden="true">
-                                <Icon
-                                    icon=app_icon_name(&win.app_id)
-                                    size=IconSize::Sm
-                                />
+                                <Icon icon=IconName::ChevronDown size=IconSize::Xs />
                             </span>
-                            <span>{win.title.clone()}</span>
-                        </SystemTaskbarButton>
-                    </For>
+                            {move || {
+                                let desktop = state.get();
+                                let hidden = ordered_taskbar_windows(&desktop)
+                                    .len()
+                                    .saturating_sub(taskbar_layout.get().visible_running_count);
+                                format!("+{hidden}")
+                            }}
+                        </SystemDockButton>
 
-                    <Show
-                        when=move || {
-                            let desktop = state.get();
-                            let running = ordered_taskbar_windows(&desktop);
-                            running.len() > taskbar_layout.get().visible_running_count
+                        <super::menus::OverflowMenu
+                            state
+                            runtime
+                            viewport_width
+                            clock_config
+                            selected_running_window
+                            window_context_menu
+                            overflow_menu_open
+                            clock_menu_open
+                        />
+                    </div>
+                </Show>
+            </SystemDockSection>
+
+            <SystemDockSection ui_slot="right">
+                <SystemDockButton
+                    id="taskbar-control-center-button"
+                    aria_label="Open control center"
+                    aria_haspopup="dialog"
+                    aria_controls="desktop-control-center"
+                    aria_expanded=control_center_open
+                    title="Open control center"
+                    selected=control_center_open
+                    ui_slot="dock-utility-button"
+                    on_click=Callback::new(move |_| {
+                        window_context_menu.set(None);
+                        overflow_menu_open.set(false);
+                        clock_menu_open.set(false);
+                        runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
+                        runtime.dispatch_action(DesktopAction::ToggleControlCenter);
+                    })
+                >
+                    <span aria-hidden="true">
+                        <Icon icon=IconName::Home size=IconSize::Md />
+                    </span>
+                </SystemDockButton>
+
+                <SystemDockButton
+                    id="taskbar-notification-button"
+                    aria_haspopup="dialog"
+                    aria_controls="desktop-notification-center"
+                    aria_expanded=notification_center_open
+                    aria_label=Signal::derive(move || {
+                        let unread = unread_notification_count.get();
+                        if unread == 0 {
+                            "Open notification center".to_string()
+                        } else {
+                            format!("Open notification center, {} unread", unread)
                         }
+                    })
+                    title="Open notification center"
+                    selected=notification_center_open
+                    ui_slot="dock-utility-button"
+                    on_click=Callback::new(move |_| {
+                        window_context_menu.set(None);
+                        overflow_menu_open.set(false);
+                        clock_menu_open.set(false);
+                        runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                        runtime.dispatch_action(DesktopAction::ToggleNotificationCenter);
+                    })
+                >
+                    <span aria-hidden="true">
+                        <Icon icon=IconName::Bell size=IconSize::Md />
+                    </span>
+                    <Show
+                        when=move || { unread_notification_count.get() > 0 }
                         fallback=|| ()
                     >
-                        <div>
-                            <SystemTaskbarOverflowButton
-                                id="taskbar-overflow-button"
-                                aria_haspopup="menu"
-                                aria_controls="taskbar-overflow-menu"
-                                aria_expanded=overflow_menu_open.read_only()
-                                on_click=Callback::new(move |_| {
-                                    window_context_menu.set(None);
-                                    clock_menu_open.set(false);
-                                    runtime.dispatch_action(DesktopAction::CloseStartMenu);
-                                    overflow_menu_open.update(|open| *open = !*open);
-                                })
-                            >
-                                <span aria-hidden="true">
-                                    <Icon icon=IconName::ChevronDown size=IconSize::Xs />
-                                </span>
-                                {move || {
-                                    let desktop = state.get();
-                                    let hidden = ordered_taskbar_windows(&desktop)
-                                        .len()
-                                        .saturating_sub(taskbar_layout.get().visible_running_count);
-                                    format!("+{hidden}")
-                                }}
-                            </SystemTaskbarOverflowButton>
-
-                            <super::menus::OverflowMenu
-                                state
-                                runtime
-                                viewport_width
-                                clock_config
-                                selected_running_window
-                                window_context_menu
-                                overflow_menu_open
-                                clock_menu_open
-                            />
-                        </div>
+                        <span>{move || unread_notification_count.get().to_string()}</span>
                     </Show>
-                </div>
-            </SystemTaskbarSection>
+                </SystemDockButton>
 
-            <SystemTaskbarSection ui_slot="right">
                 <SystemTrayList>
                     <For
                         each=move || {
@@ -480,6 +628,8 @@ pub(super) fn Taskbar() -> impl IntoView {
                                     window_context_menu.set(None);
                                     overflow_menu_open.set(false);
                                     runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                                    runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                                    runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                                 }
                                 activate_taskbar_tray_widget(runtime, widget.action);
                             })
@@ -507,6 +657,8 @@ pub(super) fn Taskbar() -> impl IntoView {
                             window_context_menu.set(None);
                             overflow_menu_open.set(false);
                             runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                            runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                            runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                             clock_menu_open.update(|open| *open = !*open);
                         })
                     >
@@ -529,14 +681,37 @@ pub(super) fn Taskbar() -> impl IntoView {
 
                     <super::menus::ClockMenu clock_config clock_menu_open />
                 </div>
-            </SystemTaskbarSection>
+            </SystemDockSection>
 
             <super::menus::StartMenu
-                state
-                runtime
-                window_context_menu
-                overflow_menu_open
-                clock_menu_open
+                launcher_open
+                close_launcher
+                activate_app=activate_launcher_app
+                return_focus_id="taskbar-start-button"
+            />
+
+            <super::menus::ControlCenterPanel
+                open=control_center_open
+                theme_mode
+                high_contrast
+                reduced_motion
+                open_window_count
+                unread_notification_count
+                close_panel=close_control_center
+                open_settings
+                toggle_theme_mode
+                toggle_high_contrast
+                toggle_reduced_motion
+                return_focus_id="taskbar-control-center-button"
+            />
+
+            <super::menus::NotificationCenterPanel
+                open=notification_center_open
+                notifications
+                close_panel=close_notification_center
+                clear_notifications
+                dismiss_notification
+                return_focus_id="taskbar-notification-button"
             />
 
             <super::menus::TaskbarWindowContextMenu
@@ -545,6 +720,6 @@ pub(super) fn Taskbar() -> impl IntoView {
                 selected_running_window
                 window_context_menu
             />
-        </SystemTaskbar>
+        </SystemDock>
     }
 }

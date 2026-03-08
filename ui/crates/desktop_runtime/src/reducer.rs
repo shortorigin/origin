@@ -12,9 +12,9 @@ use thiserror::Error;
 
 use crate::apps;
 use crate::model::{
-    DeepLinkOpenTarget, DeepLinkState, DesktopSnapshot, DesktopState, DesktopTheme,
-    InteractionState, OpenWindowRequest, PointerPosition, ResizeEdge, ResizeSession, WindowId,
-    WindowRecord, WindowRect, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH,
+    DeepLinkOpenTarget, DeepLinkState, DesktopNotification, DesktopSnapshot, DesktopState,
+    DesktopTheme, InteractionState, OpenWindowRequest, PointerPosition, ResizeEdge, ResizeSession,
+    ThemeMode, WindowId, WindowRecord, WindowRect, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH,
 };
 use crate::window_manager::{
     focus_window_internal, normalize_window_stack, resize_rect, snap_window_to_viewport_edge,
@@ -72,6 +72,14 @@ pub enum DesktopAction {
     ToggleStartMenu,
     /// Close the start menu if open.
     CloseStartMenu,
+    /// Toggle the right-side control center panel.
+    ToggleControlCenter,
+    /// Close the right-side control center panel.
+    CloseControlCenter,
+    /// Toggle the right-side notification center panel.
+    ToggleNotificationCenter,
+    /// Close the right-side notification center panel.
+    CloseNotificationCenter,
     /// Begin dragging a window.
     BeginMove {
         /// Window being dragged.
@@ -186,11 +194,25 @@ pub enum DesktopAction {
         /// Whether high contrast is enabled.
         enabled: bool,
     },
+    /// Toggle light/dark theme family.
+    SetThemeMode {
+        /// Theme family to activate.
+        mode: ThemeMode,
+    },
     /// Toggle reduced-motion rendering.
     SetReducedMotion {
         /// Whether reduced motion is enabled.
         enabled: bool,
     },
+    /// Remove one retained shell notification.
+    DismissNotification {
+        /// Notification identifier.
+        id: u64,
+    },
+    /// Mark retained notifications as read.
+    MarkNotificationsRead,
+    /// Clear retained notifications from the shell center.
+    ClearNotifications,
     /// Append a command to terminal history (subject to preferences and limits).
     PushTerminalHistory {
         /// Terminal command text.
@@ -425,6 +447,32 @@ fn clamp_window_rect_to_viewport(rect: WindowRect, viewport: WindowRect) -> Wind
     WindowRect { x, y, w, h }
 }
 
+fn close_shell_panels(state: &mut DesktopState) {
+    state.panels.launcher_open = false;
+    state.panels.control_center_open = false;
+    state.panels.notification_center_open = false;
+}
+
+fn retain_notification(
+    state: &mut DesktopState,
+    source_app_id: Option<String>,
+    title: String,
+    body: String,
+) {
+    let notification = DesktopNotification {
+        id: state.next_notification_id,
+        title,
+        body,
+        source_app_id,
+        unread: true,
+    };
+    state.next_notification_id = state.next_notification_id.saturating_add(1);
+    state.notifications.insert(0, notification);
+    if state.notifications.len() > 24 {
+        state.notifications.truncate(24);
+    }
+}
+
 /// Applies a [`DesktopAction`] to the desktop runtime state and collects resulting side effects.
 ///
 /// This function is the authoritative state transition engine for desktop window management and
@@ -444,6 +492,11 @@ pub fn reduce_desktop(
     }
     match action {
         DesktopAction::ActivateApp { app_id, viewport } => {
+            if app_id == ApplicationId::trusted("system.control-center") {
+                close_shell_panels(state);
+                state.panels.control_center_open = true;
+                return Ok(effects);
+            }
             let descriptor = apps::app_descriptor_by_id(&app_id);
 
             if descriptor.single_instance {
@@ -532,7 +585,7 @@ pub fn reduce_desktop(
             if !focus_window_internal(state, window_id) {
                 return Err(ReducerError::WindowNotFound);
             }
-            state.start_menu_open = false;
+            close_shell_panels(state);
             record_window_lifecycle(state, window_id, AppLifecycleEvent::Mounted);
             effects.push(RuntimeEffect::DispatchLifecycle {
                 window_id,
@@ -578,7 +631,7 @@ pub fn reduce_desktop(
             if !focus_window_internal(state, window_id) {
                 return Err(ReducerError::WindowNotFound);
             }
-            state.start_menu_open = false;
+            close_shell_panels(state);
             emit_focus_transition(previous_focus, Some(window_id), state, &mut effects);
             effects.push(RuntimeEffect::FocusWindowInput(window_id));
         }
@@ -713,10 +766,33 @@ pub fn reduce_desktop(
             }
         }
         DesktopAction::ToggleStartMenu => {
-            state.start_menu_open = !state.start_menu_open;
+            let will_open = !state.panels.launcher_open;
+            close_shell_panels(state);
+            state.panels.launcher_open = will_open;
         }
         DesktopAction::CloseStartMenu => {
-            state.start_menu_open = false;
+            state.panels.launcher_open = false;
+        }
+        DesktopAction::ToggleControlCenter => {
+            let will_open = !state.panels.control_center_open;
+            close_shell_panels(state);
+            state.panels.control_center_open = will_open;
+        }
+        DesktopAction::CloseControlCenter => {
+            state.panels.control_center_open = false;
+        }
+        DesktopAction::ToggleNotificationCenter => {
+            let will_open = !state.panels.notification_center_open;
+            close_shell_panels(state);
+            state.panels.notification_center_open = will_open;
+            if will_open {
+                for notification in &mut state.notifications {
+                    notification.unread = false;
+                }
+            }
+        }
+        DesktopAction::CloseNotificationCenter => {
+            state.panels.notification_center_open = false;
         }
         DesktopAction::BeginMove { window_id, pointer } => {
             ensure_modal_allows_target(state, Some(window_id))?;
@@ -1043,7 +1119,27 @@ pub fn reduce_desktop(
                     )?;
                     effects.extend(nested);
                 }
+                AppCommand::SetDesktopDarkMode { enabled } => {
+                    let nested = reduce_desktop(
+                        state,
+                        interaction,
+                        DesktopAction::SetThemeMode {
+                            mode: if enabled {
+                                ThemeMode::Dark
+                            } else {
+                                ThemeMode::Light
+                            },
+                        },
+                    )?;
+                    effects.extend(nested);
+                }
                 AppCommand::Notify { title, body } => {
+                    retain_notification(
+                        state,
+                        Some(source_app_id.to_string()),
+                        title.clone(),
+                        body.clone(),
+                    );
                     effects.push(RuntimeEffect::Notify { title, body });
                 }
             }
@@ -1074,6 +1170,19 @@ pub fn reduce_desktop(
             let storage_key = format!("{}:{}", app_id.as_str(), key.trim());
             state.app_shared_state.insert(storage_key, shared);
             effects.push(RuntimeEffect::PersistLayout);
+        }
+        DesktopAction::DismissNotification { id } => {
+            state
+                .notifications
+                .retain(|notification| notification.id != id);
+        }
+        DesktopAction::MarkNotificationsRead => {
+            for notification in &mut state.notifications {
+                notification.unread = false;
+            }
+        }
+        DesktopAction::ClearNotifications => {
+            state.notifications.clear();
         }
         DesktopAction::CompleteBootHydration {
             snapshot,
@@ -1143,6 +1252,7 @@ pub fn reduce_desktop(
         | DesktopAction::WallpaperCollectionDeleted { .. }
         | DesktopAction::WallpaperAssetDeleted { .. }
         | DesktopAction::SetHighContrast { .. }
+        | DesktopAction::SetThemeMode { .. }
         | DesktopAction::SetReducedMotion { .. } => {
             unreachable!("appearance actions are handled by reducer::appearance")
         }
@@ -1384,9 +1494,9 @@ fn command_required_capability(command: &AppCommand) -> Option<AppCapability> {
         AppCommand::Subscribe { .. }
         | AppCommand::Unsubscribe { .. }
         | AppCommand::PublishEvent { .. } => Some(AppCapability::Ipc),
-        AppCommand::SetDesktopHighContrast { .. } | AppCommand::SetDesktopReducedMotion { .. } => {
-            Some(AppCapability::Theme)
-        }
+        AppCommand::SetDesktopHighContrast { .. }
+        | AppCommand::SetDesktopReducedMotion { .. }
+        | AppCommand::SetDesktopDarkMode { .. } => Some(AppCapability::Theme),
         AppCommand::PreviewWallpaper { .. }
         | AppCommand::ApplyWallpaperPreview
         | AppCommand::SetCurrentWallpaper { .. }
@@ -1510,6 +1620,7 @@ fn command_label(command: &AppCommand) -> &'static str {
         AppCommand::DeleteWallpaperAsset { .. } => "delete-wallpaper-asset",
         AppCommand::SetDesktopHighContrast { .. } => "set-desktop-high-contrast",
         AppCommand::SetDesktopReducedMotion { .. } => "set-desktop-reduced-motion",
+        AppCommand::SetDesktopDarkMode { .. } => "set-desktop-dark-mode",
         AppCommand::Notify { .. } => "notify",
     }
 }
@@ -1683,11 +1794,8 @@ mod tests {
         )
         .expect("activate control center second");
 
-        assert_eq!(state.windows.len(), 1);
-        assert!(state
-            .windows
-            .iter()
-            .all(|w| w.app_id == ApplicationId::trusted("system.control-center")));
+        assert!(state.windows.is_empty());
+        assert!(state.panels.control_center_open);
     }
 
     #[test]

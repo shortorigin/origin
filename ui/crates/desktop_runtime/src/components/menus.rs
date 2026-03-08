@@ -1,8 +1,12 @@
 use super::*;
+use crate::model::{DesktopNotification, ThemeMode};
 use crate::wallpaper;
 use leptos::ev::MouseEvent;
 use platform_host::{WallpaperConfig, WallpaperMediaKind, WallpaperSelection};
-use system_ui::components::{MenuItem, MenuSeparator, MenuSurface};
+use system_ui::components::{
+    LauncherPanel as SystemLauncherPanel, MenuItem, MenuSeparator, MenuSurface,
+    NotificationCenter as SystemNotificationCenter, QuickSettingTile, SidePanel as SystemSidePanel,
+};
 use system_ui::primitives::{ButtonVariant, Icon, IconName, IconSize};
 
 #[component]
@@ -134,18 +138,15 @@ pub(super) fn DesktopContextMenu(
 
 #[component]
 pub(super) fn StartMenu(
-    state: RwSignal<DesktopState>,
-    runtime: DesktopRuntimeContext,
-    window_context_menu: RwSignal<Option<TaskbarWindowContextMenuState>>,
-    overflow_menu_open: RwSignal<bool>,
-    clock_menu_open: RwSignal<bool>,
+    launcher_open: Signal<bool>,
+    close_launcher: Callback<()>,
+    activate_app: Callback<ApplicationId>,
+    return_focus_id: &'static str,
 ) -> impl IntoView {
     view! {
-        <Show when=move || state.get().start_menu_open fallback=|| ()>
-            <MenuSurface
+        <Show when=move || launcher_open.get() fallback=|| ()>
+            <SystemLauncherPanel
                 id="desktop-launcher-menu"
-                ui_slot="launcher-menu"
-                role="menu"
                 aria_label="Application launcher"
                 on_keydown=Callback::new(move |ev: web_sys::KeyboardEvent| {
                     if handle_menu_roving_keydown(&ev, "desktop-launcher-menu") {
@@ -154,12 +155,19 @@ pub(super) fn StartMenu(
                     if ev.key() == "Escape" {
                         ev.prevent_default();
                         ev.stop_propagation();
-                        runtime.dispatch_action(DesktopAction::CloseStartMenu);
-                        let _ = focus_element_by_id("taskbar-start-button");
+                        close_launcher.call(());
+                        let _ = focus_element_by_id(return_focus_id);
                     }
                 })
                 on_mousedown=Callback::new(move |ev: MouseEvent| ev.stop_propagation())
             >
+                <div data-ui-slot="launcher-panel-header">
+                    <span aria-hidden="true">
+                        <Icon icon=IconName::Search size=IconSize::Sm />
+                    </span>
+                    <span>"Applications"</span>
+                </div>
+                <div data-ui-slot="launcher-grid">
                 <For each=move || apps::launcher_apps() key=|app| app.app_id.to_string() let:app>
                     {{
                         let app_id = app.app_id.clone();
@@ -171,31 +179,26 @@ pub(super) fn StartMenu(
                                 id=app_dom_id
                                 role="menuitem"
                                 on_click=Callback::new(move |_| {
-                                    window_context_menu.set(None);
-                                    overflow_menu_open.set(false);
-                                    clock_menu_open.set(false);
-                                    runtime.dispatch_action(DesktopAction::ActivateApp {
-                                        app_id: app_id.clone(),
-                                        viewport: Some(runtime.host.get_value().desktop_viewport_rect(TASKBAR_HEIGHT_PX)),
-                                    });
+                                    activate_app.call(app_id.clone());
                                 })
                             >
                                 <span aria-hidden="true">
-                                    <Icon icon=app_icon size=IconSize::Sm />
+                                    <Icon icon=app_icon size=IconSize::Md />
                                 </span>
-                                <span>{format!("Open {}", launcher_label)}</span>
+                                <span>{launcher_label}</span>
                             </MenuItem>
                         }
                     }}
                 </For>
+                </div>
                 <MenuItem
                     id="desktop-launcher-item-close"
                     role="menuitem"
-                    on_click=Callback::new(move |_| runtime.dispatch_action(DesktopAction::CloseStartMenu))
+                    on_click=Callback::new(move |_| close_launcher.call(()))
                 >
                     "Close"
                 </MenuItem>
-            </MenuSurface>
+            </SystemLauncherPanel>
         </Show>
     }
 }
@@ -343,6 +346,181 @@ pub(super) fn ClockMenu(
                     "Close"
                 </MenuItem>
             </MenuSurface>
+        </Show>
+    }
+}
+
+#[component]
+pub(super) fn ControlCenterPanel(
+    open: Signal<bool>,
+    theme_mode: Signal<ThemeMode>,
+    high_contrast: Signal<bool>,
+    reduced_motion: Signal<bool>,
+    open_window_count: Signal<usize>,
+    unread_notification_count: Signal<usize>,
+    close_panel: Callback<()>,
+    open_settings: Callback<()>,
+    toggle_theme_mode: Callback<()>,
+    toggle_high_contrast: Callback<()>,
+    toggle_reduced_motion: Callback<()>,
+    return_focus_id: &'static str,
+) -> impl IntoView {
+    view! {
+        <Show when=move || open.get() fallback=|| ()>
+            <SystemSidePanel
+                id="desktop-control-center"
+                aria_label="Control center"
+                ui_slot="control-center"
+                on_keydown=Callback::new(move |ev: web_sys::KeyboardEvent| {
+                    if ev.key() == "Escape" {
+                        ev.prevent_default();
+                        ev.stop_propagation();
+                        close_panel.call(());
+                        let _ = focus_element_by_id(return_focus_id);
+                    }
+                })
+                on_mousedown=Callback::new(move |ev: MouseEvent| ev.stop_propagation())
+            >
+                <div data-ui-slot="panel-header">
+                    <div>
+                        <strong>"Control Center"</strong>
+                        <p>"Quick appearance and system controls."</p>
+                    </div>
+                    <MenuItem
+                        id="control-center-open-settings"
+                        role="button"
+                        on_click=Callback::new(move |_| open_settings.call(()))
+                    >
+                        "Settings"
+                    </MenuItem>
+                </div>
+
+                <div data-ui-slot="quick-setting-grid">
+                    <QuickSettingTile
+                        aria_label="Toggle dark theme"
+                        selected=Signal::derive(move || matches!(theme_mode.get(), ThemeMode::Dark))
+                        on_click=Callback::new(move |_| toggle_theme_mode.call(()))
+                    >
+                        <span aria-hidden="true">
+                            {move || {
+                                if matches!(theme_mode.get(), ThemeMode::Dark) {
+                                    view! { <Icon icon=IconName::Moon size=IconSize::Sm /> }.into_view()
+                                } else {
+                                    view! { <Icon icon=IconName::Sun size=IconSize::Sm /> }.into_view()
+                                }
+                            }}
+                        </span>
+                        <span>{move || if matches!(theme_mode.get(), ThemeMode::Dark) { "Dark" } else { "Light" }}</span>
+                    </QuickSettingTile>
+
+                    <QuickSettingTile
+                        aria_label="Toggle high contrast"
+                        selected=high_contrast
+                        on_click=Callback::new(move |_| toggle_high_contrast.call(()))
+                    >
+                        <span aria-hidden="true">
+                            <Icon icon=IconName::WifiOn size=IconSize::Sm />
+                        </span>
+                        <span>"High Contrast"</span>
+                    </QuickSettingTile>
+
+                    <QuickSettingTile
+                        aria_label="Toggle reduced motion"
+                        selected=reduced_motion
+                        on_click=Callback::new(move |_| toggle_reduced_motion.call(()))
+                    >
+                        <span aria-hidden="true">
+                            <Icon icon=IconName::MotionOff size=IconSize::Sm />
+                        </span>
+                        <span>"Reduced Motion"</span>
+                    </QuickSettingTile>
+                </div>
+
+                <div data-ui-slot="panel-section">
+                    <strong>"Open Windows"</strong>
+                    <p>{move || open_window_count.get().to_string()}</p>
+                </div>
+
+                <div data-ui-slot="panel-section">
+                    <strong>"Unread Notifications"</strong>
+                    <p>{move || unread_notification_count.get().to_string()}</p>
+                </div>
+            </SystemSidePanel>
+        </Show>
+    }
+}
+
+#[component]
+pub(super) fn NotificationCenterPanel(
+    open: Signal<bool>,
+    notifications: Signal<Vec<DesktopNotification>>,
+    close_panel: Callback<()>,
+    clear_notifications: Callback<()>,
+    dismiss_notification: Callback<u64>,
+    return_focus_id: &'static str,
+) -> impl IntoView {
+    view! {
+        <Show when=move || open.get() fallback=|| ()>
+            <SystemNotificationCenter
+                id="desktop-notification-center"
+                aria_label="Notification center"
+                on_keydown=Callback::new(move |ev: web_sys::KeyboardEvent| {
+                    if ev.key() == "Escape" {
+                        ev.prevent_default();
+                        ev.stop_propagation();
+                        close_panel.call(());
+                        let _ = focus_element_by_id(return_focus_id);
+                    }
+                })
+                on_mousedown=Callback::new(move |ev: MouseEvent| ev.stop_propagation())
+            >
+                <div data-ui-slot="panel-header">
+                    <div>
+                        <strong>"Notifications"</strong>
+                        <p>"Recent system and app activity."</p>
+                    </div>
+                    <MenuItem
+                        id="notification-center-clear"
+                        role="button"
+                        on_click=Callback::new(move |_| clear_notifications.call(()))
+                    >
+                        "Clear All"
+                    </MenuItem>
+                </div>
+
+                <div data-ui-slot="notification-list">
+                    <Show
+                        when=move || !notifications.get().is_empty()
+                        fallback=|| view! { <p>"No notifications yet."</p> }
+                    >
+                        <For
+                            each=move || notifications.get()
+                            key=|notification| notification.id
+                            let:notification
+                        >
+                            <div
+                                data-ui-primitive="true"
+                                data-ui-kind="notification-item"
+                                data-ui-state=if notification.unread { "unread" } else { "read" }
+                            >
+                                <div>
+                                    <strong>{notification.title.clone()}</strong>
+                                    <p>{notification.body.clone()}</p>
+                                </div>
+                                <MenuItem
+                                    id=format!("notification-dismiss-{}", notification.id)
+                                    role="button"
+                                    on_click=Callback::new(move |_| {
+                                        dismiss_notification.call(notification.id);
+                                    })
+                                >
+                                    "Dismiss"
+                                </MenuItem>
+                            </div>
+                        </For>
+                    </Show>
+                </div>
+            </SystemNotificationCenter>
         </Show>
     }
 }

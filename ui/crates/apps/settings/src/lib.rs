@@ -168,6 +168,10 @@ pub fn SettingsApp(
         let services = services.clone();
         move || services.theme.high_contrast.get()
     });
+    let theme_dark_mode = Signal::derive({
+        let services = services.clone();
+        move || services.theme.dark_mode.get()
+    });
     let theme_reduced_motion = Signal::derive({
         let services = services.clone();
         move || services.theme.reduced_motion.get()
@@ -266,31 +270,41 @@ pub fn SettingsApp(
 
     view! {
         <AppShell>
-            <Toolbar role="tablist" aria_label="Settings sections">
-                <For
-                    each=move || {
-                        [
-                            SettingsSection::Personalize,
-                            SettingsSection::Appearance,
-                            SettingsSection::Accessibility,
-                        ]
-                    }
-                    key=|section| *section as u8
-                    let:section
-                >
-                    <Button
-                        variant=ButtonVariant::Quiet
-                        selected=Signal::derive(move || settings_state.get().active_section == section)
-                        role="tab"
-                        on_click=Callback::new(move |_| {
-                            settings_state.update(|state| state.active_section = section);
-                        })
-                    >
-                        {section.label()}
-                    </Button>
-                </For>
-            </Toolbar>
+            <div style="display:grid;grid-template-columns:minmax(220px, 280px) minmax(0, 1fr);gap:var(--origin-space-section);align-items:start;">
+                <Panel variant=SurfaceVariant::Muted>
+                    <Stack gap=LayoutGap::Md>
+                        <Heading role=TextRole::Title>"Settings"</Heading>
+                        <Text tone=TextTone::Secondary>
+                            "Personalization, appearance, and accessibility for the Origin shell."
+                        </Text>
+                        <Toolbar role="tablist" aria_label="Settings sections" layout_class="settings-sidebar">
+                            <For
+                                each=move || {
+                                    [
+                                        SettingsSection::Personalize,
+                                        SettingsSection::Appearance,
+                                        SettingsSection::Accessibility,
+                                    ]
+                                }
+                                key=|section| *section as u8
+                                let:section
+                            >
+                                <Button
+                                    variant=ButtonVariant::Quiet
+                                    selected=Signal::derive(move || settings_state.get().active_section == section)
+                                    role="tab"
+                                    on_click=Callback::new(move |_| {
+                                        settings_state.update(|state| state.active_section = section);
+                                    })
+                                >
+                                    {section.label()}
+                                </Button>
+                            </For>
+                        </Toolbar>
+                    </Stack>
+                </Panel>
 
+                <div>
             <Show when=move || settings_state.get().active_section == SettingsSection::Personalize fallback=|| ()>
                 <Surface
                     variant=SurfaceVariant::Muted
@@ -651,10 +665,27 @@ pub fn SettingsApp(
                                     <Text role=TextRole::Label>"Baseline style id"</Text>
                                     <Text>{BASELINE_STYLE_ID}</Text>
                                     <Text tone=TextTone::Secondary>
-                                        "Theme switching is intentionally removed from the mainline shell. Use wallpaper, high contrast, and reduced motion to tune the environment."
+                                        "Origin now keeps a Deepin-inspired light theme as the reference, with a matched dark companion."
                                     </Text>
                                 </Stack>
                             </Surface>
+                        </Panel>
+
+                        <Panel variant=SurfaceVariant::Standard>
+                            <Heading role=TextRole::Title>"Theme family"</Heading>
+                            <ToggleRow
+                                title="Dark appearance"
+                                description="Switch between the light reference shell and the matched dark companion."
+                                checked=theme_dark_mode
+                            >
+                                <CheckboxField
+                                    aria_label="Dark appearance"
+                                    checked=theme_dark_mode
+                                    on_change=Callback::new(move |ev| {
+                                        services.theme.set_dark_mode(event_target_checked(&ev))
+                                    })
+                                />
+                            </ToggleRow>
                         </Panel>
 
                         <DisclosurePanel
@@ -718,9 +749,14 @@ pub fn SettingsApp(
                     </Stack>
                 </Surface>
             </Show>
+                </div>
+            </div>
 
             <StatusBar>
                 <StatusBarItem>{format!("Style: {BASELINE_STYLE_ID}")}</StatusBarItem>
+                <StatusBarItem>
+                    {move || if theme_dark_mode.get() { "Theme: Dark" } else { "Theme: Light" }}
+                </StatusBarItem>
                 <StatusBarItem>
                     {move || {
                         let config = active_wallpaper.get();

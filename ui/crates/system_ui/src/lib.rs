@@ -34,9 +34,10 @@ pub mod tokens {
 pub mod prelude {
     pub use crate::components::StepStatus;
     pub use crate::components::{
-        AppShell, Button, DisclosurePanel, IconButton, StatusBar, StatusBarItem, StepFlow,
-        StepFlowActions, StepFlowHeader, StepFlowStep, ToggleRow, WindowControls, WindowFrame,
-        WindowTitleBar,
+        AppShell, Button, DisclosurePanel, Dock, DockButton, DockSection, GlassWindowFrame,
+        IconButton, LauncherPanel, NotificationCenter, QuickSettingTile, SidePanel, StatusBar,
+        StatusBarItem, StepFlow, StepFlowActions, StepFlowHeader, StepFlowStep, SystemOverlay,
+        ToggleRow, WindowControls, WindowFrame, WindowTitleBar,
     };
     pub use crate::primitives::{
         ButtonShape, ButtonSize, ButtonVariant, Center, CheckboxField, Cluster, Elevation,

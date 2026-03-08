@@ -80,7 +80,7 @@ pub(super) fn try_handle_taskbar_shortcuts(
     }
 
     if ev.key() == "Escape"
-        && (runtime.state.get_untracked().start_menu_open
+        && (runtime.state.get_untracked().panels.launcher_open
             || window_context_menu.get_untracked().is_some()
             || overflow_menu_open.get_untracked()
             || clock_menu_open.get_untracked())
