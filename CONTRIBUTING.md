@@ -11,29 +11,31 @@ All material changes are issue-driven and must follow the same GitHub workflow:
    - explicit acceptance criteria,
    - supporting technical notes, constraints, and related links where needed.
 3. Move the issue onto the organization Project in the correct `Status` column.
-4. Create a dedicated short-lived branch from the latest `main`.
-5. Name the branch with the issue identifier using:
+4. Fetch the current remote branch tips before creating a working branch: `git fetch origin`.
+5. Create a dedicated short-lived branch from `origin/main`, not from a stale local `main`.
+6. Name the branch with the issue identifier using:
    - `feature/<issue-id>-description`
    - `fix/<issue-id>-description`
    - `infra/<issue-id>-description`
    - `docs/<issue-id>-description`
    - `refactor/<issue-id>-description`
    - `research/<issue-id>-description`
-6. Implement the change on that issue branch and keep the change set small enough to review and merge quickly.
-7. Open a pull request targeting `main` that:
+7. Implement the change on that issue branch and keep the change set small enough to review and merge quickly.
+8. If the work is stacked, create the child branch from its parent branch and open the child PR against the parent branch until the base PR lands.
+9. Rebase on the current target branch before requesting merge, and rebase again if the target branch moves while the PR is open.
+10. Open a pull request targeting `main` or the parent branch in a stack that:
    - references the originating issue,
    - explains the technical change,
    - documents the testing strategy,
    - includes a closing directive such as `Closes #<issue-id>`.
-8. Merge only after review and required checks pass so GitHub automatically closes the linked issue.
+11. Merge only after review and required checks pass so GitHub automatically closes the linked issue.
 
 Example commands:
 
 ```bash
 gh issue create
-git switch main
-git pull --ff-only
-git switch -c fix/123-runtime-error-contract
+git fetch origin
+git switch -c fix/123-runtime-error-contract origin/main
 gh pr create --fill
 ```
 
@@ -47,6 +49,10 @@ gh pr create --fill
 - At least one reviewer approval is required before merge.
 - Squash merge is the default merge strategy.
 - Keep the `Closes #<issue-id>` directive in the PR body through merge so the issue closes automatically.
+- If the PR is stacked, target the parent branch until the base PR merges.
+- If the PR touches `ui/crates/desktop_runtime`, `ui/crates/system_ui`, or `ui/crates/site/src/generated`, rebase on the current target branch immediately before requesting merge.
+- Regenerate derived assets after the last rebase and before review whenever the PR changes token, shell, or generated CSS inputs.
+- Do not mix unrelated shell refactors, generated asset churn, and behavioral fixes into one PR when they can be reviewed separately.
 
 ## Labels and Milestones
 
