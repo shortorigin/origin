@@ -34,18 +34,18 @@ pub mod tokens {
 pub mod prelude {
     pub use crate::components::StepStatus;
     pub use crate::components::{
-        AppShell, Button, DisclosurePanel, Dock, DockButton, DockSection, GlassWindowFrame,
-        IconButton, LauncherPanel, NotificationCenter, QuickSettingTile, SidePanel, StatusBar,
-        StatusBarItem, StepFlow, StepFlowActions, StepFlowHeader, StepFlowStep, SystemOverlay,
-        ToggleRow, WindowControls, WindowFrame, WindowTitleBar,
+        AppShell, Button, DisclosurePanel, IconButton, LauncherPanel, NotificationCenter,
+        QuickSettingTile, SidePanel, StatusBar, StatusBarItem, StepFlow, StepFlowActions,
+        StepFlowHeader, StepFlowStep, SystemOverlay, Taskbar, TaskbarButton, TaskbarOverflowButton,
+        TaskbarSection, ToggleRow, WindowControls, WindowFrame, WindowTitleBar,
     };
     pub use crate::primitives::{
-        ButtonShape, ButtonSize, ButtonVariant, Center, CheckboxField, Cluster, Elevation,
-        FieldVariant, Grid, Heading, Icon, IconName, IconSize, Inline, Inset, Layer, LayoutAlign,
-        LayoutGap, LayoutJustify, LayoutPadding, ListSurface, Panel, ResizeHandleRegion, Stack,
-        Surface, SurfaceVariant, TerminalLine, TerminalPrompt, TerminalSurface, TerminalTranscript,
-        Text, TextField, TextRole, TextTone, TitlebarRegion, Viewport, WindowBody,
-        WindowControlButton, WindowSurface, WindowTitle,
+        ButtonShape, ButtonSize, ButtonVariant, Center, CheckboxField, Cluster, ControlTone,
+        Elevation, ElevationRole, FieldVariant, Grid, Heading, Icon, IconName, IconSize, Inline,
+        Inset, Layer, LayoutAlign, LayoutGap, LayoutJustify, LayoutPadding, ListSurface, Panel,
+        ResizeHandleRegion, Stack, Surface, SurfaceRole, SurfaceVariant, TerminalLine,
+        TerminalPrompt, TerminalSurface, TerminalTranscript, Text, TextField, TextRole, TextTone,
+        TitlebarRegion, Viewport, WindowBody, WindowControlButton, WindowSurface, WindowTitle,
     };
     pub use crate::tokens::baseline_style_id;
 }

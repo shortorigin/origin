@@ -1,8 +1,9 @@
 use super::*;
 use leptos::ev::MouseEvent;
 use system_ui::components::{
-    ClockButton as SystemClockButton, Dock as SystemDock, DockButton as SystemDockButton,
-    DockSection as SystemDockSection, SystemTray as SystemTrayList, TrayButton as SystemTrayButton,
+    ClockButton as SystemClockButton, SystemTray as SystemTrayList, Taskbar as SystemTaskbar,
+    TaskbarButton as SystemTaskbarButton, TaskbarOverflowButton as SystemTaskbarOverflowButton,
+    TaskbarSection as SystemTaskbarSection, TrayButton as SystemTrayButton,
 };
 use system_ui::primitives::{Icon, IconName, IconSize};
 
@@ -340,17 +341,16 @@ pub(super) fn Taskbar() -> impl IntoView {
     };
 
     view! {
-        <SystemDock
+        <SystemTaskbar
             role="toolbar"
-            aria_label="Desktop dock"
+            aria_label="Desktop taskbar"
             aria_keyshortcuts="Ctrl+Escape Alt+1 Alt+2 Alt+3 Alt+4 Alt+5 Alt+6 Alt+7 Alt+8 Alt+9"
             on_mousedown=Callback::new(move |ev: MouseEvent| ev.stop_propagation())
             on_keydown=Callback::new(on_taskbar_keydown)
         >
-            <SystemDockSection ui_slot="left">
-                <SystemDockButton
+            <SystemTaskbarSection ui_slot="left">
+                <SystemTaskbarButton
                     id="taskbar-start-button"
-                    ui_slot="dock-launcher-button"
                     aria_label="Open application launcher"
                     aria_haspopup="menu"
                     aria_controls="desktop-launcher-menu"
@@ -368,7 +368,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                     <span aria-hidden="true">
                         <Icon icon=IconName::Launcher size=IconSize::Md />
                     </span>
-                </SystemDockButton>
+                </SystemTaskbarButton>
 
                 <Show when=move || taskbar_layout.get().show_pins fallback=|| ()>
                     <div role="group" aria-label="Pinned apps" data-ui-slot="dock-pinned-apps">
@@ -386,7 +386,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                                 let app_icon_name_value = app_icon_name(&app_id);
                                 let app_data_id = apps::app_icon_id_by_id(&app_id).to_string();
                                 view! {
-                                    <SystemDockButton
+                                    <SystemTaskbarButton
                                         data_app=app_data_id.clone()
                                         title=Signal::derive(move || {
                                             let desktop = state.get();
@@ -426,16 +426,16 @@ pub(super) fn Taskbar() -> impl IntoView {
                                                 size=IconSize::Md
                                             />
                                         </span>
-                                    </SystemDockButton>
+                                    </SystemTaskbarButton>
                                 }
                             }}
                         </For>
                     </div>
                 </Show>
-            </SystemDockSection>
+            </SystemTaskbarSection>
 
-            <SystemDockSection
-                ui_slot="running"
+            <SystemTaskbarSection
+                ui_slot="center"
                 role="group"
                 aria_label="Running windows"
             >
@@ -451,7 +451,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                     key=|win| win.id.0
                     let:win
                 >
-                    <SystemDockButton
+                    <SystemTaskbarButton
                         id=taskbar_window_button_dom_id(win.id)
                         data_app=win.icon_id.clone()
                         aria_pressed=Signal::derive(move || win.is_focused && !win.minimized)
@@ -495,7 +495,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                             <Icon icon=app_icon_name(&win.app_id) size=IconSize::Md />
                         </span>
                         <span>{win.title.clone()}</span>
-                    </SystemDockButton>
+                    </SystemTaskbarButton>
                 </For>
 
                 <Show
@@ -507,9 +507,9 @@ pub(super) fn Taskbar() -> impl IntoView {
                     fallback=|| ()
                 >
                     <div>
-                        <SystemDockButton
+                        <SystemTaskbarOverflowButton
                             id="taskbar-overflow-button"
-                            ui_slot="dock-overflow-button"
+                            aria_label="Open hidden taskbar windows"
                             aria_haspopup="menu"
                             aria_controls="taskbar-overflow-menu"
                             aria_expanded=overflow_menu_open.read_only()
@@ -532,7 +532,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                                     .saturating_sub(taskbar_layout.get().visible_running_count);
                                 format!("+{hidden}")
                             }}
-                        </SystemDockButton>
+                        </SystemTaskbarOverflowButton>
 
                         <super::menus::OverflowMenu
                             state
@@ -546,10 +546,10 @@ pub(super) fn Taskbar() -> impl IntoView {
                         />
                     </div>
                 </Show>
-            </SystemDockSection>
+            </SystemTaskbarSection>
 
-            <SystemDockSection ui_slot="right">
-                <SystemDockButton
+            <SystemTaskbarSection ui_slot="right">
+                <SystemTaskbarButton
                     id="taskbar-control-center-button"
                     aria_label="Open control center"
                     aria_haspopup="dialog"
@@ -557,7 +557,6 @@ pub(super) fn Taskbar() -> impl IntoView {
                     aria_expanded=control_center_open
                     title="Open control center"
                     selected=control_center_open
-                    ui_slot="dock-utility-button"
                     on_click=Callback::new(move |_| {
                         window_context_menu.set(None);
                         overflow_menu_open.set(false);
@@ -570,9 +569,9 @@ pub(super) fn Taskbar() -> impl IntoView {
                     <span aria-hidden="true">
                         <Icon icon=IconName::Home size=IconSize::Md />
                     </span>
-                </SystemDockButton>
+                </SystemTaskbarButton>
 
-                <SystemDockButton
+                <SystemTaskbarButton
                     id="taskbar-notification-button"
                     aria_haspopup="dialog"
                     aria_controls="desktop-notification-center"
@@ -587,7 +586,6 @@ pub(super) fn Taskbar() -> impl IntoView {
                     })
                     title="Open notification center"
                     selected=notification_center_open
-                    ui_slot="dock-utility-button"
                     on_click=Callback::new(move |_| {
                         window_context_menu.set(None);
                         overflow_menu_open.set(false);
@@ -606,7 +604,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                     >
                         <span>{move || unread_notification_count.get().to_string()}</span>
                     </Show>
-                </SystemDockButton>
+                </SystemTaskbarButton>
 
                 <SystemTrayList>
                     <For
@@ -681,7 +679,7 @@ pub(super) fn Taskbar() -> impl IntoView {
 
                     <super::menus::ClockMenu clock_config clock_menu_open />
                 </div>
-            </SystemDockSection>
+            </SystemTaskbarSection>
 
             <super::menus::StartMenu
                 launcher_open
@@ -720,6 +718,6 @@ pub(super) fn Taskbar() -> impl IntoView {
                 selected_running_window
                 window_context_menu
             />
-        </SystemDock>
+        </SystemTaskbar>
     }
 }

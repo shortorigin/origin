@@ -1,13 +1,14 @@
 use leptos::*;
 
 use crate::foundation::{
-    bool_token, merge_layout_class, ButtonSize, ButtonVariant, Elevation, SurfaceVariant,
+    bool_token, merge_layout_class, ButtonSize, ButtonVariant, ControlTone, ElevationRole,
+    SurfaceRole,
 };
 
 #[component]
 pub fn WindowSurface(
-    #[prop(default = SurfaceVariant::Modal)] variant: SurfaceVariant,
-    #[prop(default = Elevation::Modal)] elevation: Elevation,
+    #[prop(default = SurfaceRole::Modal)] surface_role: SurfaceRole,
+    #[prop(default = ElevationRole::Modal)] elevation_role: ElevationRole,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] style: MaybeSignal<String>,
     #[prop(optional, into)] focused: MaybeSignal<bool>,
@@ -26,8 +27,8 @@ pub fn WindowSurface(
             data-origin-primitive="window-surface"
             data-ui-primitive="true"
             data-ui-kind="window-surface"
-            data-ui-variant=variant.token()
-            data-ui-elevation=elevation.token()
+            data-ui-surface-role=surface_role.token()
+            data-ui-elevation-role=elevation_role.token()
             data-ui-focused=move || bool_token(focused.get())
             data-ui-minimized=move || bool_token(minimized.get())
             data-ui-maximized=move || bool_token(maximized.get())
@@ -45,6 +46,7 @@ pub fn WindowSurface(
 #[component]
 pub fn TitlebarRegion(
     #[prop(optional)] layout_class: Option<&'static str>,
+    #[prop(default = SurfaceRole::WindowActive)] surface_role: SurfaceRole,
     #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
     #[prop(optional)] on_dblclick: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
@@ -55,7 +57,8 @@ pub fn TitlebarRegion(
             data-origin-primitive="titlebar-region"
             data-ui-primitive="true"
             data-ui-kind="titlebar-region"
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=surface_role.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
                     on_pointerdown.call(ev);
@@ -82,8 +85,9 @@ pub fn ResizeHandleRegion(
             class=merge_layout_class("origin-resize-handle-region", layout_class)
             data-origin-primitive="resize-handle-region"
             data-ui-primitive="true"
-            data-ui-kind="resize-handle-region"
+            data-ui-kind="resize-handle"
             data-ui-slot=edge
+            aria-hidden="true"
         />
     }
 }
@@ -99,6 +103,7 @@ pub fn WindowTitle(
             data-origin-primitive="window-title"
             data-ui-primitive="true"
             data-ui-kind="window-title"
+            data-ui-variant="label"
         >
             {children()}
         </div>
@@ -116,8 +121,8 @@ pub fn WindowBody(
             data-origin-primitive="window-body"
             data-ui-primitive="true"
             data-ui-kind="window-body"
-            data-ui-variant=SurfaceVariant::Standard.token()
-            data-ui-elevation=Elevation::Embedded.token()
+            data-ui-surface-role=SurfaceRole::WindowActive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
         >
             {children()}
         </div>
@@ -126,6 +131,7 @@ pub fn WindowBody(
 
 #[component]
 pub fn WindowControlButton(
+    #[prop(default = ControlTone::Neutral)] control_tone: ControlTone,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] aria_label: MaybeSignal<String>,
     #[prop(optional, into)] title: MaybeSignal<String>,
@@ -143,6 +149,7 @@ pub fn WindowControlButton(
             disabled=disabled
             variant=ButtonVariant::Quiet
             size=ButtonSize::Sm
+            control_tone=control_tone
             ui_slot="window-control"
             on_pointerdown=Callback::new(move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {

@@ -1,6 +1,6 @@
 //! Desktop runtime state model, reducer, persistence hooks, and shell components.
 //!
-//! `desktop_runtime` is the main API surface for the retro desktop shell. It exposes:
+//! `desktop_runtime` is the main API surface for the managed desktop shell. It exposes:
 //!
 //! - data types in [`model`]
 //! - state transitions in [`reduce_desktop`]

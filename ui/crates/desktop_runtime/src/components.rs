@@ -36,9 +36,15 @@ use crate::{
 };
 use system_ui::components::{DesktopBackdrop, DesktopIcon, DesktopIconGrid, DesktopWindowLayer};
 use system_ui::primitives::{Icon, IconName, IconSize};
-use system_ui::tokens::SHELL_TASKBAR_HEIGHT_PX;
+use system_ui::tokens::{
+    SHELL_DESKTOP_PADDING_PX, SHELL_TASKBAR_BUTTON_HEIGHT_PX, SHELL_TASKBAR_CLOCK_MIN_WIDTH_PX,
+    SHELL_TASKBAR_HEIGHT_PX,
+};
 
 const TASKBAR_HEIGHT_PX: i32 = SHELL_TASKBAR_HEIGHT_PX;
+const TASKBAR_BUTTON_HEIGHT_PX: i32 = SHELL_TASKBAR_BUTTON_HEIGHT_PX;
+const TASKBAR_CLOCK_MIN_WIDTH_PX: i32 = SHELL_TASKBAR_CLOCK_MIN_WIDTH_PX;
+const DESKTOP_PADDING_PX: i32 = SHELL_DESKTOP_PADDING_PX;
 #[cfg(target_arch = "wasm32")]
 const E2E_START_BUTTON_ATTR: &str = "data-e2e-state";
 
@@ -693,18 +699,34 @@ fn compute_taskbar_layout(
         tray_widget_count.min(1)
     };
     let mut show_clock_date = desired_clock_show_date && viewport_width >= 920;
+    let compact_start_width = TASKBAR_BUTTON_HEIGHT_PX + (DESKTOP_PADDING_PX * 2);
+    let regular_start_width = compact_start_width + 24;
+    let pinned_item_width = TASKBAR_BUTTON_HEIGHT_PX + DESKTOP_PADDING_PX;
+    let tray_item_width = TASKBAR_BUTTON_HEIGHT_PX + DESKTOP_PADDING_PX + 12;
+    let base_tray_width = TASKBAR_BUTTON_HEIGHT_PX - 10;
+    let clock_compact_width = TASKBAR_CLOCK_MIN_WIDTH_PX;
+    let clock_expanded_width = TASKBAR_CLOCK_MIN_WIDTH_PX + 44;
+    let reserved_edge_padding = DESKTOP_PADDING_PX * 3;
 
     // Priority order under pressure: hide date, reduce tray widgets, then collapse pinned strip.
     loop {
-        let start_width = if viewport_width < 640 { 72 } else { 108 };
+        let start_width = if viewport_width < 640 {
+            compact_start_width
+        } else {
+            regular_start_width
+        };
         let pins_width = if show_pins {
-            (pinned_count as i32) * 42 + 8
+            (pinned_count as i32) * pinned_item_width + DESKTOP_PADDING_PX
         } else {
             0
         };
-        let tray_width = 22 + ((visible_tray_widget_count as i32) * 56);
-        let clock_width = if show_clock_date { 132 } else { 88 };
-        let reserved = start_width + pins_width + tray_width + clock_width + 40;
+        let tray_width = base_tray_width + ((visible_tray_widget_count as i32) * tray_item_width);
+        let clock_width = if show_clock_date {
+            clock_expanded_width
+        } else {
+            clock_compact_width
+        };
+        let reserved = start_width + pins_width + tray_width + clock_width + reserved_edge_padding;
         let available = viewport_width - reserved;
 
         if available >= 120 || (!show_clock_date && visible_tray_widget_count <= 1 && !show_pins) {
@@ -726,15 +748,23 @@ fn compute_taskbar_layout(
         break;
     }
 
-    let start_width = if viewport_width < 640 { 72 } else { 108 };
+    let start_width = if viewport_width < 640 {
+        compact_start_width
+    } else {
+        regular_start_width
+    };
     let pins_width = if show_pins {
-        (pinned_count as i32) * 42 + 8
+        (pinned_count as i32) * pinned_item_width + DESKTOP_PADDING_PX
     } else {
         0
     };
-    let tray_width = 22 + ((visible_tray_widget_count as i32) * 56);
-    let clock_width = if show_clock_date { 132 } else { 88 };
-    let reserved = start_width + pins_width + tray_width + clock_width + 40;
+    let tray_width = base_tray_width + ((visible_tray_widget_count as i32) * tray_item_width);
+    let clock_width = if show_clock_date {
+        clock_expanded_width
+    } else {
+        clock_compact_width
+    };
+    let reserved = start_width + pins_width + tray_width + clock_width + reserved_edge_padding;
     let available = (viewport_width - reserved).max(0);
 
     if running_count == 0 {
@@ -748,13 +778,17 @@ fn compute_taskbar_layout(
     }
 
     let full_item_width = if viewport_width >= 1200 {
-        176
+        TASKBAR_BUTTON_HEIGHT_PX + 136
     } else if viewport_width >= 900 {
-        156
+        TASKBAR_BUTTON_HEIGHT_PX + 120
     } else {
-        138
+        TASKBAR_BUTTON_HEIGHT_PX + 104
     };
-    let compact_item_width = if viewport_width >= 900 { 52 } else { 46 };
+    let compact_item_width = if viewport_width >= 900 {
+        TASKBAR_BUTTON_HEIGHT_PX + 20
+    } else {
+        TASKBAR_BUTTON_HEIGHT_PX + 14
+    };
     let full_visible = (available / full_item_width).max(0) as usize;
     if full_visible >= running_count {
         return TaskbarLayoutPlan {

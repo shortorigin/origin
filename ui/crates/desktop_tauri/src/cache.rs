@@ -8,6 +8,8 @@ use tauri::Manager;
 
 type CacheDomain = BTreeMap<String, String>;
 type CacheMap = BTreeMap<String, CacheDomain>;
+const EXPLORER_CACHE_NAME: &str = "origin-explorer-cache-v1";
+const LEGACY_EXPLORER_CACHE_NAME: &str = "retrodesk-explorer-cache-v1";
 
 fn cache_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -77,17 +79,34 @@ impl ScopedCacheStore {
         let mut map = load_cache_map(&self.file)?;
         let domain = map.entry(cache_name.to_string()).or_default();
         domain.insert(key.to_string(), value.to_string());
+        if cache_name == EXPLORER_CACHE_NAME {
+            map.remove(LEGACY_EXPLORER_CACHE_NAME);
+        }
         save_cache_map(&self.file, &map)
     }
 
     /// Loads cache text content by `cache_name` and `key`.
     pub fn get_text(&self, cache_name: &str, key: &str) -> Result<Option<String>, String> {
         validate_cache_key(cache_name, key)?;
-        let map = load_cache_map(&self.file)?;
-        Ok(map
+        let mut map = load_cache_map(&self.file)?;
+        if let Some(value) = map
             .get(cache_name)
             .and_then(|domain| domain.get(key))
-            .cloned())
+            .cloned()
+        {
+            return Ok(Some(value));
+        }
+
+        if cache_name == EXPLORER_CACHE_NAME {
+            if let Some(legacy_domain) = map.remove(LEGACY_EXPLORER_CACHE_NAME) {
+                let value = legacy_domain.get(key).cloned();
+                map.insert(cache_name.to_string(), legacy_domain);
+                save_cache_map(&self.file, &map)?;
+                return Ok(value);
+            }
+        }
+
+        Ok(None)
     }
 
     /// Deletes cache content by `cache_name` and `key`.
@@ -98,6 +117,14 @@ impl ScopedCacheStore {
             domain.remove(key);
             if domain.is_empty() {
                 map.remove(cache_name);
+            }
+        }
+        if cache_name == EXPLORER_CACHE_NAME {
+            if let Some(domain) = map.get_mut(LEGACY_EXPLORER_CACHE_NAME) {
+                domain.remove(key);
+                if domain.is_empty() {
+                    map.remove(LEGACY_EXPLORER_CACHE_NAME);
+                }
             }
         }
         save_cache_map(&self.file, &map)
@@ -171,7 +198,7 @@ mod tests {
         assert!(initial.is_empty());
 
         let mut map = CacheMap::new();
-        map.entry("retrodesk-explorer-cache-v1".to_string())
+        map.entry("origin-explorer-cache-v1".to_string())
             .or_default()
             .insert(
                 "file-preview:/docs/readme.txt".to_string(),
@@ -217,10 +244,7 @@ mod tests {
         let store = ScopedCacheStore::from_root(&root).expect("init scoped cache store");
 
         let err = store
-            .get_text(
-                "retrodesk-explorer-cache-v1",
-                "file-preview:/docs/readme.txt",
-            )
+            .get_text("origin-explorer-cache-v1", "file-preview:/docs/readme.txt")
             .expect_err("malformed cache map should fail");
         assert!(
             err.starts_with(&format!(

@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 type PrefMap = BTreeMap<String, String>;
+const LEGACY_EXPLORER_PREFS_KEY: &str = "retrodesk.explorer.prefs.v1";
+const EXPLORER_PREFS_KEY: &str = "origin.explorer.prefs.v1";
 
 fn prefs_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -73,8 +75,20 @@ impl ScopedPrefsStore {
     /// Loads a preference payload by key.
     pub fn load(&self, key: &str) -> Result<Option<String>, String> {
         validate_key(key)?;
-        let map = load_pref_map(&self.file)?;
-        Ok(map.get(key).cloned())
+        let mut map = load_pref_map(&self.file)?;
+        if let Some(value) = map.get(key).cloned() {
+            return Ok(Some(value));
+        }
+
+        if key == EXPLORER_PREFS_KEY {
+            if let Some(value) = map.remove(LEGACY_EXPLORER_PREFS_KEY) {
+                map.insert(key.to_string(), value.clone());
+                save_pref_map(&self.file, &map)?;
+                return Ok(Some(value));
+            }
+        }
+
+        Ok(None)
     }
 
     /// Saves a preference payload by key.
@@ -82,6 +96,9 @@ impl ScopedPrefsStore {
         validate_key(key)?;
         let mut map = load_pref_map(&self.file)?;
         map.insert(key.to_string(), raw_json.to_string());
+        if key == EXPLORER_PREFS_KEY {
+            map.remove(LEGACY_EXPLORER_PREFS_KEY);
+        }
         save_pref_map(&self.file, &map)
     }
 
@@ -90,6 +107,9 @@ impl ScopedPrefsStore {
         validate_key(key)?;
         let mut map = load_pref_map(&self.file)?;
         map.remove(key);
+        if key == EXPLORER_PREFS_KEY {
+            map.remove(LEGACY_EXPLORER_PREFS_KEY);
+        }
         save_pref_map(&self.file, &map)
     }
 }
@@ -153,7 +173,7 @@ mod tests {
 
         let mut map = PrefMap::new();
         map.insert(
-            "retrodesk.explorer.prefs.v1".to_string(),
+            "origin.explorer.prefs.v1".to_string(),
             "{\"k\":1}".to_string(),
         );
         save_pref_map(&path, &map).expect("save map");
@@ -189,7 +209,7 @@ mod tests {
         let store = ScopedPrefsStore::from_root(&root).expect("init scoped prefs store");
 
         let err = store
-            .load("retrodesk.explorer.prefs.v1")
+            .load("origin.explorer.prefs.v1")
             .expect_err("malformed prefs map should fail");
         assert!(
             err.starts_with(&format!(

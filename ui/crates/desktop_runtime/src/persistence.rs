@@ -6,16 +6,22 @@ use leptos::logging;
 use platform_host::build_app_state_envelope;
 use platform_host::{
     load_pref_with, migrate_envelope_payload, save_pref_with, AppStateEnvelope, HostResult,
-    WallpaperConfig, WallpaperSelection, DESKTOP_STATE_NAMESPACE,
+    PrefsStore, WallpaperConfig, WallpaperSelection, DESKTOP_STATE_NAMESPACE,
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_arch = "wasm32")]
-const SNAPSHOT_KEY: &str = "retrodesk.layout.v1";
+const SNAPSHOT_KEY: &str = "origin.shell.layout.v1";
+#[cfg(target_arch = "wasm32")]
+const LEGACY_SNAPSHOT_KEY: &str = "retrodesk.layout.v1";
+const THEME_KEY: &str = "origin.shell.theme.v1";
 const LEGACY_THEME_KEY: &str = "retrodesk.theme.v1";
-const THEME_KEY: &str = "system.desktop_theme.v2";
-const WALLPAPER_KEY: &str = "system.desktop_wallpaper.v1";
-const TERMINAL_HISTORY_KEY: &str = "retrodesk.terminal_history.v1";
+const PREVIOUS_THEME_KEY: &str = "system.desktop_theme.v2";
+const WALLPAPER_KEY: &str = "origin.shell.wallpaper.v1";
+const PREVIOUS_WALLPAPER_KEY: &str = "system.desktop_wallpaper.v1";
+const TERMINAL_HISTORY_KEY: &str = "origin.shell.terminal-history.v1";
+#[cfg(target_arch = "wasm32")]
+const LEGACY_TERMINAL_HISTORY_KEY: &str = "retrodesk.terminal_history.v1";
 /// Persisted runtime policy overlay key for app capability grants.
 pub const APP_POLICY_KEY: &str = "system.app_policy.v1";
 
@@ -82,19 +88,20 @@ pub async fn load_boot_snapshot(_host: &DesktopHostContext) -> Option<DesktopSna
     {
         let host = _host;
         let storage = local_storage()?;
-        let snapshot = storage
-            .get_item(SNAPSHOT_KEY)
-            .ok()
-            .flatten()
-            .and_then(|raw| serde_json::from_str::<DesktopSnapshot>(&raw).ok());
-        let terminal_history =
-            match load_pref_with(host.prefs_store().as_ref(), TERMINAL_HISTORY_KEY).await {
-                Ok(history) => history,
-                Err(err) => {
-                    logging::warn!("terminal history compatibility load failed: {err}");
-                    None
-                }
-            };
+        let snapshot = load_snapshot_with_migration(&storage);
+        let terminal_history = match load_pref_with_migration::<Vec<String>>(
+            host.prefs_store().as_ref(),
+            TERMINAL_HISTORY_KEY,
+            &[LEGACY_TERMINAL_HISTORY_KEY],
+        )
+        .await
+        {
+            Ok(history) => history,
+            Err(err) => {
+                logging::warn!("terminal history compatibility load failed: {err}");
+                None
+            }
+        };
 
         match (snapshot, terminal_history) {
             (None, None) => None,
@@ -222,7 +229,13 @@ pub async fn persist_theme(host: &DesktopHostContext, theme: &DesktopTheme) -> H
 
 /// Loads the current desktop theme from typed prefs, falling back to the legacy combined payload.
 pub async fn load_theme(host: &DesktopHostContext) -> Option<DesktopTheme> {
-    match load_pref_with(host.prefs_store().as_ref(), THEME_KEY).await {
+    match load_pref_with_migration::<DesktopTheme>(
+        host.prefs_store().as_ref(),
+        THEME_KEY,
+        &[PREVIOUS_THEME_KEY, LEGACY_THEME_KEY],
+    )
+    .await
+    {
         Ok(Some(theme)) => Some(theme),
         Ok(None) => load_legacy_theme(host).await.map(|legacy| DesktopTheme {
             mode: Default::default(),
@@ -246,7 +259,13 @@ pub async fn persist_wallpaper(
 
 /// Loads the current wallpaper configuration from typed prefs, falling back to the legacy theme payload.
 pub async fn load_wallpaper(host: &DesktopHostContext) -> Option<WallpaperConfig> {
-    match load_pref_with(host.prefs_store().as_ref(), WALLPAPER_KEY).await {
+    match load_pref_with_migration::<WallpaperConfig>(
+        host.prefs_store().as_ref(),
+        WALLPAPER_KEY,
+        &[PREVIOUS_WALLPAPER_KEY],
+    )
+    .await
+    {
         Ok(Some(wallpaper)) => Some(normalize_wallpaper(wallpaper)),
         Ok(None) => load_legacy_theme(host).await.map(|legacy| WallpaperConfig {
             selection: WallpaperSelection::BuiltIn {
@@ -277,7 +296,13 @@ fn normalize_wallpaper(mut wallpaper: WallpaperConfig) -> WallpaperConfig {
 }
 
 async fn load_legacy_theme(host: &DesktopHostContext) -> Option<LegacyThemePayload> {
-    match load_pref_with(host.prefs_store().as_ref(), LEGACY_THEME_KEY).await {
+    match load_pref_with_migration::<LegacyThemePayload>(
+        host.prefs_store().as_ref(),
+        LEGACY_THEME_KEY,
+        &[],
+    )
+    .await
+    {
         Ok(value) => value,
         Err(err) => {
             logging::warn!("legacy theme compatibility load failed: {err}");
@@ -292,6 +317,56 @@ pub async fn persist_terminal_history(
     history: &[String],
 ) -> HostResult<()> {
     save_pref_with(host.prefs_store().as_ref(), TERMINAL_HISTORY_KEY, &history).await
+}
+
+async fn load_pref_with_migration<T>(
+    store: &dyn PrefsStore,
+    canonical_key: &str,
+    legacy_keys: &[&str],
+) -> HostResult<Option<T>>
+where
+    T: for<'de> Deserialize<'de> + Serialize + Clone,
+{
+    if let Some(value) = load_pref_with(store, canonical_key).await? {
+        return Ok(Some(value));
+    }
+
+    for legacy_key in legacy_keys {
+        if let Some(value) = load_pref_with(store, legacy_key).await? {
+            save_pref_with(store, canonical_key, &value).await?;
+            let _ = store.delete_pref(legacy_key).await;
+            return Ok(Some(value));
+        }
+    }
+
+    Ok(None)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn load_snapshot_with_migration(storage: &web_sys::Storage) -> Option<DesktopSnapshot> {
+    if let Some(snapshot) = storage
+        .get_item(SNAPSHOT_KEY)
+        .ok()
+        .flatten()
+        .and_then(|raw| serde_json::from_str::<DesktopSnapshot>(&raw).ok())
+    {
+        return Some(snapshot);
+    }
+
+    let legacy = storage
+        .get_item(LEGACY_SNAPSHOT_KEY)
+        .ok()
+        .flatten()
+        .and_then(|raw| serde_json::from_str::<DesktopSnapshot>(&raw).ok());
+
+    if let Some(snapshot) = legacy.clone() {
+        if let Ok(raw) = serde_json::to_string(&snapshot) {
+            let _ = storage.set_item(SNAPSHOT_KEY, &raw);
+        }
+        let _ = storage.remove_item(LEGACY_SNAPSHOT_KEY);
+    }
+
+    legacy
 }
 
 /// Loads app capability policy overlay from typed host prefs storage.

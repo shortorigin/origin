@@ -1,10 +1,11 @@
 use leptos::*;
 
-use crate::foundation::{merge_layout_class, Elevation, LayoutPadding};
+use crate::foundation::{merge_layout_class, ElevationRole, LayoutPadding, SurfaceRole};
 
 #[component]
 pub fn Layer(
-    #[prop(default = Elevation::Overlay)] elevation: Elevation,
+    #[prop(default = ElevationRole::Floating)] elevation_role: ElevationRole,
+    #[prop(default = SurfaceRole::Menu)] surface_role: SurfaceRole,
     #[prop(default = LayoutPadding::None)] padding: LayoutPadding,
     #[prop(optional)] layout_class: Option<&'static str>,
     children: Children,
@@ -15,7 +16,8 @@ pub fn Layer(
             data-origin-primitive="layer"
             data-ui-primitive="true"
             data-ui-kind="layer"
-            data-ui-elevation=elevation.token()
+            data-ui-surface-role=surface_role.token()
+            data-ui-elevation-role=elevation_role.token()
             data-ui-padding=padding.token()
         >
             {children()}
@@ -26,6 +28,8 @@ pub fn Layer(
 #[component]
 pub fn Viewport(
     #[prop(optional)] layout_class: Option<&'static str>,
+    #[prop(optional, into)] role: Option<String>,
+    #[prop(optional, into)] aria_label: Option<String>,
     children: Children,
 ) -> impl IntoView {
     view! {
@@ -34,6 +38,9 @@ pub fn Viewport(
             data-origin-primitive="viewport"
             data-ui-primitive="true"
             data-ui-kind="viewport"
+            data-ui-surface-role=SurfaceRole::Shell.token()
+            role=role
+            aria-label=aria_label
         >
             {children()}
         </div>

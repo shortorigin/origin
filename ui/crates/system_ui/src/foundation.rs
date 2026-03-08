@@ -1,5 +1,83 @@
 //! Shared non-legacy UI style enums and helper utilities.
 
+/// Canonical shell surface roles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SurfaceRole {
+    /// Root shell/desktop backdrop treatment.
+    Shell,
+    /// Persistent taskbar chrome.
+    Taskbar,
+    /// Focused or foreground window surface.
+    WindowActive,
+    /// Inactive managed window surface.
+    WindowInactive,
+    /// Floating menus and transient popovers.
+    Menu,
+    /// Modal and blocking surfaces.
+    #[default]
+    Modal,
+}
+
+impl SurfaceRole {
+    pub(crate) fn token(self) -> &'static str {
+        match self {
+            Self::Shell => "shell",
+            Self::Taskbar => "taskbar",
+            Self::WindowActive => "window-active",
+            Self::WindowInactive => "window-inactive",
+            Self::Menu => "menu",
+            Self::Modal => "modal",
+        }
+    }
+}
+
+/// Canonical shell elevation roles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ElevationRole {
+    /// Embedded shell chrome.
+    Embedded,
+    /// Raised but not dominant surfaces.
+    Raised,
+    /// Foreground/floating surfaces.
+    #[default]
+    Floating,
+    /// Modal surfaces.
+    Modal,
+}
+
+impl ElevationRole {
+    pub(crate) fn token(self) -> &'static str {
+        match self {
+            Self::Embedded => "embedded",
+            Self::Raised => "raised",
+            Self::Floating => "floating",
+            Self::Modal => "modal",
+        }
+    }
+}
+
+/// Canonical shell control tones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ControlTone {
+    /// Neutral glass control.
+    #[default]
+    Neutral,
+    /// Accent-emphasized control.
+    Accent,
+    /// Destructive control.
+    Danger,
+}
+
+impl ControlTone {
+    pub(crate) fn token(self) -> &'static str {
+        match self {
+            Self::Neutral => "neutral",
+            Self::Accent => "accent",
+            Self::Danger => "danger",
+        }
+    }
+}
+
 /// Semantic surface variants for structural primitives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SurfaceVariant {

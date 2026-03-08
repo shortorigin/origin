@@ -12,8 +12,9 @@ use system_ui::components::{
     WindowTitleBar as SystemWindowTitleBar,
 };
 use system_ui::primitives::{
-    Icon, IconName, IconSize, WindowBody as SystemWindowBody,
-    WindowControlButton as SystemWindowControlButton, WindowTitle as SystemWindowTitle,
+    ControlTone, ElevationRole, Icon, IconName, IconSize, SurfaceRole,
+    WindowBody as SystemWindowBody, WindowControlButton as SystemWindowControlButton,
+    WindowTitle as SystemWindowTitle,
 };
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
@@ -110,6 +111,8 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
     view! {
         <Show when=move || window.get().is_some() fallback=|| ()>
             <SystemWindowFrame
+                surface_role=SurfaceRole::WindowInactive
+                elevation_role=ElevationRole::Raised
                 style=Signal::derive(move || {
                     let win = window.get().expect("window exists while shown");
                     format!(
@@ -135,6 +138,7 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
                 })
             >
                 <SystemWindowTitleBar
+                    surface_role=SurfaceRole::WindowActive
                     on_pointerdown=Callback::new(begin_move)
                     on_dblclick=Callback::new(titlebar_double_click)
                 >
@@ -162,6 +166,7 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
                     </SystemWindowTitle>
                     <SystemWindowControls>
                         <SystemWindowControlButton
+                            control_tone=ControlTone::Neutral
                             disabled=Signal::derive(move || {
                                 !window
                                     .get()
@@ -183,6 +188,7 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
                             <Icon icon=IconName::WindowMinimize size=IconSize::Xs />
                         </SystemWindowControlButton>
                         <SystemWindowControlButton
+                            control_tone=ControlTone::Neutral
                             disabled=Signal::derive(move || {
                                 !window
                                     .get()
@@ -224,6 +230,7 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
                             }}
                         </SystemWindowControlButton>
                         <SystemWindowControlButton
+                            control_tone=ControlTone::Danger
                             aria_label="Close window"
                             on_pointerdown=Callback::new(move |ev: web_sys::PointerEvent| {
                                 ev.prevent_default();
