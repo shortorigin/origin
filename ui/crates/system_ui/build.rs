@@ -24,6 +24,7 @@ struct TokenFile {
     state: StateTokens,
     icon: BTreeMap<String, String>,
     shell: ShellTokens,
+    theme: ThemeTokens,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,9 +75,18 @@ struct StateTokens {
 #[derive(Debug, Deserialize)]
 struct ShellTokens {
     taskbar: BTreeMap<String, String>,
+    dock: BTreeMap<String, String>,
+    panel: BTreeMap<String, String>,
+    notification: BTreeMap<String, String>,
     titlebar: BTreeMap<String, String>,
     window_chrome: BTreeMap<String, String>,
     resize_handle: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ThemeTokens {
+    default: String,
+    dark: BTreeMap<String, String>,
 }
 
 fn sanitize_ident(raw: &str) -> String {
@@ -279,16 +289,16 @@ body,
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--origin-color-accent) 18%, transparent), transparent 26%),
-    radial-gradient(circle at 86% 10%, color-mix(in srgb, var(--origin-color-success) 12%, transparent), transparent 28%),
-    linear-gradient(180deg, var(--origin-color-canvas), color-mix(in srgb, var(--origin-color-desktop) 88%, #02060d));
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--origin-color-accent) 16%, white), transparent 28%),
+    radial-gradient(circle at 88% 14%, color-mix(in srgb, var(--origin-color-success) 10%, white), transparent 26%),
+    linear-gradient(180deg, color-mix(in srgb, var(--origin-color-canvas) 96%, white), var(--origin-color-desktop));
   color: var(--origin-color-text-primary);
   font-family: var(--origin-type-family-sans);
   font-size: var(--origin-type-size-body);
@@ -336,6 +346,7 @@ a {
 [data-ui-kind="statusbar-item"],
 [data-ui-kind="window-controls"],
 [data-ui-kind="taskbar-section"],
+[data-ui-kind="dock-section"],
 [data-ui-kind="tray-list"] {
   display: flex;
   align-items: center;
@@ -885,19 +896,19 @@ a {
 [data-ui-kind="viewport"] {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) var(--origin-shell-taskbar-height);
+  grid-template-rows: minmax(0, 1fr) var(--origin-shell-dock-height);
   background:
-    radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--origin-color-accent) 12%, transparent), transparent 26%),
-    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--origin-color-success) 10%, transparent), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--origin-color-desktop) 94%, transparent), var(--origin-color-desktop));
+    radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--origin-color-accent) 12%, white), transparent 28%),
+    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--origin-color-success) 9%, white), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--origin-color-canvas) 92%, white), var(--origin-color-desktop));
 }
 
 [data-ui-kind="desktop-backdrop"] {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at center top, color-mix(in srgb, var(--origin-color-text-primary) 4%, transparent), transparent 42%),
-    linear-gradient(180deg, color-mix(in srgb, var(--origin-color-desktop) 88%, var(--origin-color-canvas)), var(--origin-color-desktop));
+    radial-gradient(circle at center top, color-mix(in srgb, white 42%, transparent), transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--origin-color-canvas) 92%, white), var(--origin-color-desktop));
 }
 
 [data-ui-kind="wallpaper-layer"],
@@ -919,12 +930,19 @@ a {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at top center, color-mix(in srgb, var(--origin-color-text-primary) 8%, transparent), transparent 34%),
-    linear-gradient(180deg, color-mix(in srgb, var(--origin-material-overlay-density-strong) 70%, transparent), transparent 34%, color-mix(in srgb, var(--origin-color-canvas) 22%, transparent));
+    radial-gradient(circle at top center, color-mix(in srgb, white 52%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--origin-material-overlay-density-soft) 74%, transparent), transparent 34%, color-mix(in srgb, white 18%, transparent));
 }
 
 [data-ui-slot="dismiss-layer"] {
   z-index: var(--origin-z-desktop);
+}
+
+[data-ui-kind="system-overlay"] {
+  position: absolute;
+  inset: 0;
+  z-index: var(--origin-z-overlay);
+  pointer-events: none;
 }
 
 [data-ui-kind="desktop-icon-grid"] {
@@ -1066,57 +1084,165 @@ a {
 }
 
 [data-ui-slot="launcher-menu"] {
-  left: var(--origin-space-3);
-  bottom: calc(var(--origin-shell-taskbar-height) + var(--origin-space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--origin-shell-dock-height) + var(--origin-shell-dock-floating-offset));
 }
 
-[data-ui-kind="taskbar"] {
+[data-ui-kind="launcher-panel"] {
+  position: absolute;
+  min-width: min(680px, calc(100vw - 48px));
+  max-width: min(760px, calc(100vw - 48px));
+  padding: var(--origin-space-5);
+  z-index: var(--origin-z-menu);
+}
+
+[data-ui-slot="launcher-panel-header"] {
+  display: flex;
+  align-items: center;
+  gap: var(--origin-space-2);
+  margin-bottom: var(--origin-space-4);
+  color: var(--origin-color-text-secondary);
+}
+
+[data-ui-slot="launcher-grid"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--origin-space-3);
+}
+
+[data-ui-kind="side-panel"],
+[data-ui-kind="notification-center"] {
+  position: absolute;
+  top: var(--origin-space-4);
+  right: var(--origin-space-4);
+  bottom: calc(var(--origin-shell-dock-height) + var(--origin-space-4));
+  width: min(var(--origin-shell-panel-width), calc(100vw - 32px));
+  padding: var(--origin-shell-panel-padding);
+  z-index: var(--origin-z-menu);
+  overflow: auto;
+}
+
+[data-ui-kind="notification-center"] {
+  display: grid;
+  gap: var(--origin-shell-notification-item-gap);
+}
+
+[data-ui-slot="panel-header"] {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--origin-space-3);
+  margin-bottom: var(--origin-space-4);
+}
+
+[data-ui-slot="panel-header"] p,
+[data-ui-slot="panel-section"] p {
+  margin: var(--origin-space-1) 0 0;
+  color: var(--origin-color-text-secondary);
+}
+
+[data-ui-slot="quick-setting-grid"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--origin-space-3);
+  margin-bottom: var(--origin-space-5);
+}
+
+[data-ui-slot="quick-setting-tile"] {
+  min-height: 92px;
+  border-radius: var(--origin-radius-lg);
+  display: grid;
+  justify-items: start;
+  align-content: space-between;
+  gap: var(--origin-space-2);
+  padding: var(--origin-space-4);
+  background: color-mix(in srgb, var(--origin-surface-background-control) 94%, white);
+}
+
+[data-ui-slot="quick-setting-tile"][data-ui-selected="true"] {
+  background: color-mix(in srgb, var(--origin-color-accent) 14%, var(--origin-surface-background-control));
+  border-color: var(--origin-color-border-selected);
+}
+
+[data-ui-kind="notification-item"] {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--origin-space-3);
+  padding: var(--origin-space-4);
+  border-radius: var(--origin-radius-lg);
+  border: var(--origin-border-width-standard) solid color-mix(in srgb, var(--origin-surface-border-control) 82%, transparent);
+  background: color-mix(in srgb, var(--origin-surface-background-control) 96%, white);
+}
+
+[data-ui-kind="notification-item"][data-ui-state="unread"] {
+  border-color: var(--origin-color-border-selected);
+  box-shadow: var(--origin-shadow-focus-ring);
+}
+
+[data-ui-kind="taskbar"],
+[data-ui-kind="dock"] {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--origin-space-3);
-  padding-inline: var(--origin-space-3);
-  min-height: var(--origin-shell-taskbar-height);
-  border-top: var(--origin-border-width-standard) solid color-mix(in srgb, var(--origin-surface-border-overlay) 82%, transparent);
+  margin: 0 auto var(--origin-shell-dock-floating-offset);
+  padding: var(--origin-shell-dock-padding);
+  min-height: var(--origin-shell-dock-height);
+  width: min(calc(100vw - 28px), 1060px);
+  border: var(--origin-border-width-standard) solid color-mix(in srgb, var(--origin-surface-border-overlay) 82%, transparent);
+  border-radius: var(--origin-radius-round);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--origin-surface-highlight-overlay) 94%, transparent), transparent 70%),
-    color-mix(in srgb, var(--origin-surface-background-overlay) 92%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, var(--origin-surface-highlight-overlay) 96%, transparent), transparent 72%),
+    color-mix(in srgb, var(--origin-surface-background-overlay) 96%, white);
   box-shadow: var(--origin-shadow-overlay);
   backdrop-filter: blur(var(--origin-elevation-blur-floating)) saturate(170%);
   -webkit-backdrop-filter: blur(var(--origin-elevation-blur-floating)) saturate(170%);
 }
 
 [data-ui-kind="taskbar-section"],
+[data-ui-kind="dock-section"],
 [data-ui-kind="tray-list"] {
   gap: var(--origin-space-2);
   min-width: 0;
+  padding: 0;
 }
 
-[data-ui-kind="taskbar-section"][data-ui-slot="running"] {
-  padding: var(--origin-space-1q);
-  border-radius: var(--origin-radius-round);
-  background: color-mix(in srgb, var(--origin-surface-background-control) 55%, transparent);
-  border: var(--origin-border-width-standard) solid color-mix(in srgb, var(--origin-surface-border-control) 76%, transparent);
-  backdrop-filter: blur(var(--origin-elevation-blur-raised));
-  -webkit-backdrop-filter: blur(var(--origin-elevation-blur-raised));
+[data-ui-kind="taskbar-section"][data-ui-slot="running"],
+[data-ui-kind="dock-section"][data-ui-slot="running"] {
+  justify-content: center;
 }
 
 [data-ui-kind="taskbar-section"][data-ui-slot="start"],
-[data-ui-kind="taskbar-section"][data-ui-slot="tray"] {
-  padding: var(--origin-space-1q);
-  border-radius: var(--origin-radius-round);
+[data-ui-kind="taskbar-section"][data-ui-slot="tray"],
+[data-ui-kind="dock-section"][data-ui-slot="left"],
+[data-ui-kind="dock-section"][data-ui-slot="right"] {
+  justify-content: flex-start;
+}
+
+[data-ui-kind="taskbar-section"][data-ui-slot="tray"],
+[data-ui-kind="dock-section"][data-ui-slot="right"] {
+  justify-content: flex-end;
 }
 
 [data-ui-slot="taskbar-button"],
+[data-ui-slot="dock-button"],
+[data-ui-slot="dock-launcher-button"],
+[data-ui-slot="dock-utility-button"],
+[data-ui-slot="dock-overflow-button"],
 [data-ui-slot="tray-button"],
 [data-ui-slot="clock-button"],
 [data-ui-slot="taskbar-overflow-button"],
 [data-ui-slot="start-button"],
 [data-ui-slot="window-control"] {
-  min-height: var(--origin-shell-taskbar-button-height);
+  min-height: var(--origin-shell-dock-button-size);
 }
 
 [data-ui-slot="taskbar-button"],
+[data-ui-slot="dock-button"],
+[data-ui-slot="dock-launcher-button"],
+[data-ui-slot="dock-utility-button"],
+[data-ui-slot="dock-overflow-button"],
 [data-ui-slot="tray-button"],
 [data-ui-slot="clock-button"],
 [data-ui-slot="taskbar-overflow-button"],
@@ -1125,6 +1251,9 @@ a {
 }
 
 [data-ui-slot="taskbar-button"][data-ui-selected="true"],
+[data-ui-slot="dock-button"][data-ui-selected="true"],
+[data-ui-slot="dock-launcher-button"][data-ui-selected="true"],
+[data-ui-slot="dock-utility-button"][data-ui-selected="true"],
 [data-ui-slot="clock-button"][data-ui-selected="true"],
 [data-ui-slot="tray-button"][data-ui-selected="true"],
 [data-ui-slot="start-button"][data-ui-selected="true"] {
@@ -1139,8 +1268,8 @@ a {
 }
 
 [data-ui-slot="tray-button"] {
-  width: var(--origin-shell-taskbar-button-height);
-  min-width: var(--origin-shell-taskbar-button-height);
+  width: var(--origin-shell-dock-button-size);
+  min-width: var(--origin-shell-dock-button-size);
   padding: 0;
 }
 
@@ -1174,6 +1303,7 @@ a {
   [data-ui-kind="list-surface"],
   [data-ui-kind="layer"],
   [data-ui-kind="menu-surface"],
+  [data-ui-kind="launcher-panel"],
   [data-ui-kind="terminal-surface"],
   [data-ui-kind="completion-list"],
   [data-ui-kind="window-surface"],
@@ -1181,7 +1311,9 @@ a {
   [data-ui-kind="toolbar"],
   [data-ui-kind="statusbar"],
   [data-ui-kind="taskbar"],
-  [data-ui-kind="taskbar-section"][data-ui-slot="running"],
+  [data-ui-kind="dock"],
+  [data-ui-kind="side-panel"],
+  [data-ui-kind="notification-center"],
   [data-ui-kind="desktop-icon-button"] > span:first-child {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -1189,9 +1321,13 @@ a {
   }
 
   [data-ui-kind="menu-surface"],
+  [data-ui-kind="launcher-panel"],
   [data-ui-kind="window-surface"],
   [data-ui-kind="window-frame"],
-  [data-ui-kind="taskbar"] {
+  [data-ui-kind="taskbar"],
+  [data-ui-kind="dock"],
+  [data-ui-kind="side-panel"],
+  [data-ui-kind="notification-center"] {
     background: color-mix(in srgb, var(--origin-surface-background-overlay) 98%, var(--origin-color-canvas));
   }
 }
@@ -1211,10 +1347,23 @@ a {
     padding: var(--origin-space-4);
   }
 
-  [data-ui-kind="taskbar"] {
+  [data-ui-kind="taskbar"],
+  [data-ui-kind="dock"] {
     grid-template-columns: 1fr;
     padding-block: var(--origin-space-2);
     height: auto;
+    width: calc(100vw - 20px);
+  }
+
+  [data-ui-kind="side-panel"],
+  [data-ui-kind="notification-center"],
+  [data-ui-kind="launcher-panel"] {
+    left: var(--origin-space-3);
+    right: var(--origin-space-3);
+    width: auto;
+    max-width: none;
+    bottom: calc(var(--origin-shell-dock-height) + var(--origin-space-3));
+    transform: none;
   }
 
   [data-ui-kind="desktop-window-layer"] {
@@ -1249,6 +1398,7 @@ fn main() {
     let tokens_path = manifest_dir.join("tokens/tokens.toml");
     let raw = fs::read_to_string(&tokens_path).expect("read tokens.toml");
     let tokens: TokenFile = toml::from_str(&raw).expect("parse tokens.toml");
+    let _theme_default = tokens.theme.default.as_str();
 
     let mut rust = String::from("// Generated by system_ui/build.rs. Do not edit by hand.\n");
     rust.push_str("pub const BASELINE_STYLE_ID: &str = \"origin-baseline\";\n");
@@ -1291,6 +1441,9 @@ fn main() {
     push_const_block(&mut rust, "STATE_DISABLED", &tokens.state.disabled);
     push_const_block(&mut rust, "STATE_SELECTED", &tokens.state.selected);
     push_const_block(&mut rust, "SHELL_TASKBAR", &tokens.shell.taskbar);
+    push_const_block(&mut rust, "SHELL_DOCK", &tokens.shell.dock);
+    push_const_block(&mut rust, "SHELL_PANEL", &tokens.shell.panel);
+    push_const_block(&mut rust, "SHELL_NOTIFICATION", &tokens.shell.notification);
     push_const_block(&mut rust, "SHELL_TITLEBAR", &tokens.shell.titlebar);
     push_const_block(
         &mut rust,
@@ -1343,10 +1496,23 @@ fn main() {
     push_css_vars(&mut css, "state-disabled", &tokens.state.disabled);
     push_css_vars(&mut css, "state-selected", &tokens.state.selected);
     push_css_vars(&mut css, "shell-taskbar", &tokens.shell.taskbar);
+    push_css_vars(&mut css, "shell-dock", &tokens.shell.dock);
+    push_css_vars(&mut css, "shell-panel", &tokens.shell.panel);
+    push_css_vars(&mut css, "shell-notification", &tokens.shell.notification);
     push_css_vars(&mut css, "shell-titlebar", &tokens.shell.titlebar);
     push_css_vars(&mut css, "shell-window-chrome", &tokens.shell.window_chrome);
     push_css_vars(&mut css, "shell-resize-handle", &tokens.shell.resize_handle);
     css.push_str("}\n");
+    css.push_str(&format!(
+        "\n:root[data-theme=\"dark\"],\n.desktop-shell[data-theme=\"dark\"] {{\n{}\n}}\n",
+        tokens
+            .theme
+            .dark
+            .iter()
+            .map(|(key, value)| format!("  --origin-{key}: {value};"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    ));
     css.push_str(
         "\n:root[data-high-contrast=\"true\"],\n.desktop-shell[data-high-contrast=\"true\"] {\n  --origin-color-canvas: #010101;\n  --origin-color-desktop: #040608;\n  --origin-color-text-primary: #ffffff;\n  --origin-color-text-secondary: #f2f5f9;\n  --origin-color-text-muted: #dde5ee;\n  --origin-color-text-inverse: #020305;\n  --origin-color-border-focus: #ffffff;\n  --origin-color-border-selected: #9ed1ff;\n  --origin-surface-background-base: rgba(12, 18, 28, 0.96);\n  --origin-surface-background-raised: rgba(17, 24, 36, 0.98);\n  --origin-surface-background-overlay: rgba(18, 24, 35, 0.985);\n  --origin-surface-background-modal: rgba(20, 28, 40, 0.992);\n  --origin-surface-background-control: rgba(16, 23, 34, 0.98);\n  --origin-surface-border-base: rgba(255, 255, 255, 0.48);\n  --origin-surface-border-raised: rgba(255, 255, 255, 0.58);\n  --origin-surface-border-overlay: rgba(255, 255, 255, 0.72);\n  --origin-surface-border-modal: rgba(255, 255, 255, 0.78);\n  --origin-surface-border-control: rgba(255, 255, 255, 0.56);\n  --origin-shadow-panel: none;\n  --origin-shadow-window: none;\n  --origin-shadow-overlay: none;\n  --origin-shadow-glass: none;\n  --origin-shadow-pressed: none;\n  --origin-shadow-focus-ring: 0 0 0 3px rgba(255, 255, 255, 0.34);\n}\n",
     );

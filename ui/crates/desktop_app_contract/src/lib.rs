@@ -475,6 +475,11 @@ pub enum AppCommand {
         /// Whether reduced motion should be enabled.
         enabled: bool,
     },
+    /// Toggle the shell theme family.
+    SetDesktopDarkMode {
+        /// Whether the dark theme should be enabled.
+        enabled: bool,
+    },
     /// Emit a host notification.
     Notify {
         /// Notification title.
@@ -747,6 +752,8 @@ impl CacheHostService {
 /// Theme service for shell appearance/accessibility actions.
 pub struct ThemeService {
     sender: Callback<AppCommand>,
+    /// Whether the dark theme family is active.
+    pub dark_mode: ReadSignal<bool>,
     /// Current high-contrast flag.
     pub high_contrast: ReadSignal<bool>,
     /// Current reduced-motion flag.
@@ -754,6 +761,11 @@ pub struct ThemeService {
 }
 
 impl ThemeService {
+    /// Requests theme-family toggle.
+    pub fn set_dark_mode(&self, enabled: bool) {
+        self.sender.call(AppCommand::SetDesktopDarkMode { enabled });
+    }
+
     /// Requests high contrast toggle.
     pub fn set_high_contrast(&self, enabled: bool) {
         self.sender
@@ -1291,6 +1303,7 @@ impl AppServices {
         explorer: Rc<dyn ExplorerFsService>,
         cache: Rc<dyn ContentCache>,
         shared_state: ReadSignal<BTreeMap<String, Value>>,
+        theme_dark_mode: ReadSignal<bool>,
         theme_high_contrast: ReadSignal<bool>,
         theme_reduced_motion: ReadSignal<bool>,
         wallpaper_current: ReadSignal<WallpaperConfig>,
@@ -1317,6 +1330,7 @@ impl AppServices {
             cache: CacheHostService::new(cache),
             theme: ThemeService {
                 sender,
+                dark_mode: theme_dark_mode,
                 high_contrast: theme_high_contrast,
                 reduced_motion: theme_reduced_motion,
             },

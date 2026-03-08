@@ -39,10 +39,29 @@ fn inspect_runtime_registration(runtime: DesktopRuntimeContext) -> AppCommandReg
                 Ok(system_shell_contract::CommandResult {
                     output: super::super::record_data(vec![
                         super::super::int_field("windows", desktop.windows.len() as i64),
-                        super::super::bool_field("start_menu_open", desktop.start_menu_open),
+                        super::super::bool_field("launcher_open", desktop.panels.launcher_open),
+                        super::super::bool_field(
+                            "control_center_open",
+                            desktop.panels.control_center_open,
+                        ),
+                        super::super::bool_field(
+                            "notification_center_open",
+                            desktop.panels.notification_center_open,
+                        ),
                         super::super::string_field("style", BASELINE_STYLE_ID),
+                        super::super::string_field(
+                            "theme_mode",
+                            match desktop.theme.mode {
+                                crate::model::ThemeMode::Light => "light",
+                                crate::model::ThemeMode::Dark => "dark",
+                            },
+                        ),
                         super::super::bool_field("high_contrast", desktop.theme.high_contrast),
                         super::super::bool_field("reduced_motion", desktop.theme.reduced_motion),
+                        super::super::int_field(
+                            "notifications",
+                            desktop.notifications.len() as i64,
+                        ),
                         super::super::int_field(
                             "terminal_history_len",
                             desktop.terminal_history.len() as i64,

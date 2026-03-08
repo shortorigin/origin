@@ -98,6 +98,10 @@ pub(super) fn reduce_appearance_action(
             state.theme.high_contrast = *enabled;
             effects.push(RuntimeEffect::PersistTheme);
         }
+        DesktopAction::SetThemeMode { mode } => {
+            state.theme.mode = *mode;
+            effects.push(RuntimeEffect::PersistTheme);
+        }
         DesktopAction::SetReducedMotion { enabled } => {
             state.theme.reduced_motion = *enabled;
             effects.push(RuntimeEffect::PersistTheme);

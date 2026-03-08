@@ -308,6 +308,10 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
     let session = ensure_window_session(runtime.app_runtime, window_id);
     let lifecycle = session.lifecycle.read_only();
     let inbox = session.inbox;
+    let theme_dark_mode = create_rw_signal(matches!(
+        runtime.state.get_untracked().theme.mode,
+        crate::model::ThemeMode::Dark
+    ));
     let theme_high_contrast = create_rw_signal(runtime.state.get_untracked().theme.high_contrast);
     let theme_reduced_motion = create_rw_signal(runtime.state.get_untracked().theme.reduced_motion);
     let wallpaper_current = create_rw_signal(runtime.state.get_untracked().wallpaper);
@@ -317,6 +321,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
     let shared_state = create_rw_signal(runtime.state.get_untracked().app_shared_state);
     create_effect(move |_| {
         let desktop = runtime.state.get();
+        theme_dark_mode.set(matches!(desktop.theme.mode, crate::model::ThemeMode::Dark));
         theme_high_contrast.set(desktop.theme.high_contrast);
         theme_reduced_motion.set(desktop.theme.reduced_motion);
         wallpaper_current.set(desktop.wallpaper);
@@ -378,6 +383,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         runtime.host.get_value().explorer_fs_service(),
         runtime.host.get_value().content_cache(),
         shared_state.read_only(),
+        theme_dark_mode.read_only(),
         theme_high_contrast.read_only(),
         theme_reduced_motion.read_only(),
         wallpaper_current.read_only(),

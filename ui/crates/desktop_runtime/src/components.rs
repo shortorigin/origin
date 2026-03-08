@@ -297,6 +297,8 @@ pub fn DesktopShell() -> impl IntoView {
     let open_system_settings = Callback::new(move |_| {
         desktop_context_menu.set(None);
         runtime.dispatch_action(DesktopAction::CloseStartMenu);
+        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
         open_system_settings(runtime, TASKBAR_HEIGHT_PX);
     });
 
@@ -310,6 +312,8 @@ pub fn DesktopShell() -> impl IntoView {
 
         browser_e2e_scene_applied.set(true);
         runtime.dispatch_action(DesktopAction::CloseStartMenu);
+        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
         desktop_context_menu.set(None);
         set_start_button_e2e_state(None, false);
 
@@ -441,12 +445,19 @@ pub fn DesktopShell() -> impl IntoView {
                     .as_ref()
                     .map(|_| browser_e2e_ready.get().to_string())
             }
+            data-theme=move || match state.get().theme.mode {
+                crate::model::ThemeMode::Light => "light",
+                crate::model::ThemeMode::Dark => "dark",
+            }
             data-high-contrast=move || state.get().theme.high_contrast.to_string()
             data-reduced-motion=move || state.get().theme.reduced_motion.to_string()
             on:click=move |_| {
                 if desktop_context_menu.get_untracked().is_some() {
                     desktop_context_menu.set(None);
                 }
+                runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
             }
             on:pointermove=on_pointer_move
             on:pointerup=on_pointer_end
@@ -460,11 +471,15 @@ pub fn DesktopShell() -> impl IntoView {
                     on:mousedown=move |_| {
                         desktop_context_menu.set(None);
                         runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                     }
                     on:contextmenu=move |ev| {
                         ev.prevent_default();
                         ev.stop_propagation();
                         runtime.dispatch_action(DesktopAction::CloseStartMenu);
+                        runtime.dispatch_action(DesktopAction::CloseControlCenter);
+                        runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
                         open_desktop_context_menu(
                             runtime.host.get_value(),
                             desktop_context_menu,

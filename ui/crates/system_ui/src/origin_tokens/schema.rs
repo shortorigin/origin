@@ -20,6 +20,7 @@ pub struct TokenFile {
     pub state: StateTokens,
     pub icon: BTreeMap<String, String>,
     pub shell: ShellTokens,
+    pub theme: ThemeTokens,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,9 +71,18 @@ pub struct StateTokens {
 #[derive(Debug, Deserialize)]
 pub struct ShellTokens {
     pub taskbar: BTreeMap<String, String>,
+    pub dock: BTreeMap<String, String>,
+    pub panel: BTreeMap<String, String>,
+    pub notification: BTreeMap<String, String>,
     pub titlebar: BTreeMap<String, String>,
     pub window_chrome: BTreeMap<String, String>,
     pub resize_handle: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThemeTokens {
+    pub default: String,
+    pub dark: BTreeMap<String, String>,
 }
 
 #[cfg(test)]
@@ -88,6 +98,10 @@ mod tests {
         assert!(tokens.surface.background.contains_key("modal"));
         assert!(tokens.elevation.blur.contains_key("floating"));
         assert!(tokens.state.selected.contains_key("surface"));
+        assert_eq!(tokens.theme.default, "light");
+        assert!(tokens.theme.dark.contains_key("color-canvas"));
+        assert!(tokens.shell.dock.contains_key("button-size"));
+        assert!(tokens.shell.panel.contains_key("width"));
     }
 
     #[test]
