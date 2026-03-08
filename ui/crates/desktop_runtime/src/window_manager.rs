@@ -1,11 +1,12 @@
 //! Shared window-manager transition helpers used by the desktop reducer.
 
 use crate::model::{DesktopState, ResizeEdge, WindowId, WindowRect};
+use system_ui::tokens::{SHELL_WINDOW_MIN_HEIGHT_PX, SHELL_WINDOW_MIN_WIDTH_PX};
 
 /// Minimum allowed managed window width.
-pub const MIN_WINDOW_WIDTH: i32 = 320;
+pub const MIN_WINDOW_WIDTH: i32 = SHELL_WINDOW_MIN_WIDTH_PX;
 /// Minimum allowed managed window height.
-pub const MIN_WINDOW_HEIGHT: i32 = 220;
+pub const MIN_WINDOW_HEIGHT: i32 = SHELL_WINDOW_MIN_HEIGHT_PX;
 /// Pointer threshold (in px) for snap-edge behavior.
 pub const SNAP_EDGE_THRESHOLD: i32 = 24;
 

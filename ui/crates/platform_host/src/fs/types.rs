@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Cache API cache name used for explorer text previews.
-pub const EXPLORER_CACHE_NAME: &str = "retrodesk-explorer-cache-v1";
+pub const EXPLORER_CACHE_NAME: &str = "origin-explorer-cache-v1";
 /// localStorage key used for explorer UI preferences.
-pub const EXPLORER_PREFS_KEY: &str = "retrodesk.explorer.prefs.v1";
+pub const EXPLORER_PREFS_KEY: &str = "origin.explorer.prefs.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]

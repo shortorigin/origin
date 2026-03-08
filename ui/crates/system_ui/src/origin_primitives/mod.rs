@@ -1,6 +1,7 @@
 pub use crate::foundation::{
-    ButtonShape, ButtonSize, ButtonVariant, Elevation, FieldVariant, LayoutAlign, LayoutGap,
-    LayoutJustify, LayoutPadding, SurfaceVariant, TextRole, TextTone,
+    ButtonShape, ButtonSize, ButtonVariant, ControlTone, Elevation, ElevationRole, FieldVariant,
+    LayoutAlign, LayoutGap, LayoutJustify, LayoutPadding, SurfaceRole, SurfaceVariant, TextRole,
+    TextTone,
 };
 pub use crate::icon::{Icon, IconName, IconSize};
 pub use data::{

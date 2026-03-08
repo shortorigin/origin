@@ -1,11 +1,11 @@
 use leptos::*;
 
-use crate::foundation::{bool_token, merge_layout_class, Elevation, SurfaceVariant};
+use crate::foundation::{bool_token, merge_layout_class, ElevationRole, SurfaceRole};
 
 #[component]
 pub fn WindowFrame(
-    #[prop(default = SurfaceVariant::Modal)] variant: SurfaceVariant,
-    #[prop(default = Elevation::Modal)] elevation: Elevation,
+    #[prop(default = SurfaceRole::Modal)] surface_role: SurfaceRole,
+    #[prop(default = ElevationRole::Modal)] elevation_role: ElevationRole,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] style: MaybeSignal<String>,
     #[prop(optional, into)] aria_label: MaybeSignal<String>,
@@ -24,44 +24,8 @@ pub fn WindowFrame(
             data-origin-component="window-frame"
             data-ui-primitive="true"
             data-ui-kind="window-frame"
-            data-ui-variant=variant.token()
-            data-ui-elevation=elevation.token()
-            data-ui-focused=move || bool_token(focused.get())
-            data-ui-minimized=move || bool_token(minimized.get())
-            data-ui-maximized=move || bool_token(maximized.get())
-            on:pointerdown=move |ev| {
-                if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
-                }
-            }
-        >
-            {children()}
-        </section>
-    }
-}
-
-#[component]
-pub fn GlassWindowFrame(
-    #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] style: MaybeSignal<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] focused: MaybeSignal<bool>,
-    #[prop(optional, into)] minimized: MaybeSignal<bool>,
-    #[prop(optional, into)] maximized: MaybeSignal<bool>,
-    #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
-    children: Children,
-) -> impl IntoView {
-    view! {
-        <section
-            class=merge_layout_class("ui-window-frame", layout_class)
-            style=move || style.get()
-            role="dialog"
-            aria-label=move || aria_label.get()
-            data-origin-component="glass-window-frame"
-            data-ui-primitive="true"
-            data-ui-kind="window-frame"
-            data-ui-variant=SurfaceVariant::Modal.token()
-            data-ui-elevation=Elevation::Modal.token()
+            data-ui-surface-role=surface_role.token()
+            data-ui-elevation-role=elevation_role.token()
             data-ui-focused=move || bool_token(focused.get())
             data-ui-minimized=move || bool_token(minimized.get())
             data-ui-maximized=move || bool_token(maximized.get())
@@ -79,6 +43,7 @@ pub fn GlassWindowFrame(
 #[component]
 pub fn WindowTitleBar(
     #[prop(optional)] layout_class: Option<&'static str>,
+    #[prop(default = SurfaceRole::WindowActive)] surface_role: SurfaceRole,
     #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
     #[prop(optional)] on_dblclick: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
@@ -89,7 +54,8 @@ pub fn WindowTitleBar(
             data-origin-component="window-titlebar"
             data-ui-primitive="true"
             data-ui-kind="window-titlebar"
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=surface_role.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
                     on_pointerdown.call(ev);

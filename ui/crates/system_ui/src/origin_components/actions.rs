@@ -1,7 +1,9 @@
 use leptos::ev::KeyboardEvent;
 use leptos::*;
 
-use crate::foundation::{bool_token, merge_layout_class, ButtonShape, ButtonSize, ButtonVariant};
+use crate::foundation::{
+    bool_token, merge_layout_class, ButtonShape, ButtonSize, ButtonVariant, ControlTone,
+};
 use crate::origin_primitives::{Icon, IconName, IconSize};
 
 #[component]
@@ -9,6 +11,7 @@ pub fn Button(
     #[prop(default = ButtonVariant::Standard)] variant: ButtonVariant,
     #[prop(default = ButtonSize::Md)] size: ButtonSize,
     #[prop(default = ButtonShape::Standard)] shape: ButtonShape,
+    #[prop(default = ControlTone::Neutral)] control_tone: ControlTone,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
     #[prop(optional, into)] role: Option<String>,
@@ -61,6 +64,7 @@ pub fn Button(
             data-ui-variant=variant.token()
             data-ui-size=size.token()
             data-ui-shape=shape.token()
+            data-ui-control-tone=control_tone.token()
             data-ui-state=move || {
                 if pressed.get() {
                     "pressed"
@@ -116,6 +120,7 @@ pub fn IconButton(
     icon: IconName,
     #[prop(default = ButtonVariant::Icon)] variant: ButtonVariant,
     #[prop(default = ButtonSize::Md)] size: ButtonSize,
+    #[prop(default = ControlTone::Neutral)] control_tone: ControlTone,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] aria_label: MaybeSignal<String>,
     #[prop(optional, into)] title: MaybeSignal<String>,
@@ -138,6 +143,7 @@ pub fn IconButton(
             data-ui-variant=variant.token()
             data-ui-size=size.token()
             data-ui-shape=ButtonShape::Circle.token()
+            data-ui-control-tone=control_tone.token()
             data-ui-pressed=move || bool_token(pressed.get())
             data-ui-disabled=move || bool_token(disabled.get())
             on:click=move |ev| {

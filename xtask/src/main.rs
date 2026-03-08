@@ -199,6 +199,7 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
                 &package_command_with_packages(&["test", "--all-targets"], UI_PACKAGES, &[]),
             )?;
             verify_ui_browser_manifest_hygiene(&workspace_root)?;
+            verify_ui_shell_style_hygiene(&workspace_root)?;
             run_ui_preview_smoke(&workspace_root)?;
             run_ui(vec![
                 "build".to_string(),
@@ -223,6 +224,7 @@ fn run_verify(args: Vec<String>) -> Result<(), String> {
                 ],
             )?;
             cargo(&workspace_root, &["test", "--workspace", "--all-targets"])?;
+            verify_ui_shell_style_hygiene(&workspace_root)?;
         }
         other => return Err(format!("unknown verification profile `{other}`")),
     }
@@ -513,6 +515,57 @@ fn verify_ui_browser_manifest_hygiene(workspace_root: &Path) -> Result<(), Strin
     Ok(())
 }
 
+fn verify_ui_shell_style_hygiene(workspace_root: &Path) -> Result<(), String> {
+    let patterns = [
+        "#[0-9A-Fa-f]{3,8}",
+        "rgba\\(",
+        "box-shadow",
+        "backdrop-filter",
+        "font-size",
+        "border-radius",
+    ];
+    let targets = [
+        "ui/crates/system_ui/src/origin_primitives",
+        "ui/crates/system_ui/src/origin_components",
+        "ui/crates/desktop_runtime/src/components",
+        "ui/crates/site/src",
+    ];
+    let existing_targets: Vec<_> = targets
+        .iter()
+        .filter(|target| workspace_root.join(target).exists())
+        .copied()
+        .collect();
+
+    if existing_targets.is_empty() {
+        return Ok(());
+    }
+
+    for pattern in patterns {
+        let output = Command::new("rg")
+            .current_dir(workspace_root)
+            .arg("-n")
+            .arg(pattern)
+            .args(&existing_targets)
+            .arg("--glob")
+            .arg("!ui/crates/site/src/generated/**")
+            .output()
+            .map_err(|error| format!("failed to run rg for UI style hygiene: {error}"))?;
+        if !output.status.success() && output.status.code() != Some(1) {
+            return Err(format!(
+                "UI style hygiene scan failed for pattern `{pattern}`"
+            ));
+        }
+        if output.status.code() == Some(0) {
+            return Err(format!(
+                "forbidden hardcoded UI styling matched `{pattern}`:\n{}",
+                String::from_utf8_lossy(&output.stdout)
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn normalize_dist_arg(workspace_root: &Path, args: &mut [String]) {
     let mut index = 0usize;
     while index < args.len() {
@@ -569,6 +622,7 @@ mod tests {
     use super::{
         args_include_lattice, drop_no_open_arg, normalize_dist_arg, prepend_get_hosts,
         probe_http_root, sanitize_trunk_environment, verify_ui_browser_manifest_hygiene,
+        verify_ui_shell_style_hygiene,
     };
     use std::fs;
     use std::io::{Read, Write};
@@ -712,6 +766,35 @@ mod tests {
 
         let error = verify_ui_browser_manifest_hygiene(&root).expect_err("hygiene should fail");
         assert!(error.contains("typed `Navigator.storage()` bindings"));
+        fs::remove_dir_all(root).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn verify_ui_shell_style_hygiene_accepts_tokenized_shell_sources() {
+        let root = unique_temp_dir("ui-style-hygiene-pass");
+        let primitives = root.join("ui/crates/system_ui/src/origin_primitives");
+        let runtime = root.join("ui/crates/desktop_runtime/src/components");
+        let site = root.join("ui/crates/site/src");
+        fs::create_dir_all(&primitives).expect("create primitives dir");
+        fs::create_dir_all(&runtime).expect("create runtime dir");
+        fs::create_dir_all(site.join("generated")).expect("create generated dir");
+        fs::write(
+            primitives.join("shell.rs"),
+            "const STYLE: &str = \"var(--origin-semantic-surface-taskbar-background)\";\n",
+        )
+        .expect("write primitives source");
+        fs::write(
+            runtime.join("taskbar.rs"),
+            "const OK: &str = \"taskbar\";\n",
+        )
+        .expect("write runtime source");
+        fs::write(
+            site.join("generated").join("tailwind.css"),
+            "box-shadow: legacy;\n",
+        )
+        .expect("write generated source");
+
+        verify_ui_shell_style_hygiene(&root).expect("style hygiene should pass");
         fs::remove_dir_all(root).expect("cleanup temp dir");
     }
 }

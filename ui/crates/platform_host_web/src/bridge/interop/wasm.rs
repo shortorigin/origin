@@ -9,12 +9,16 @@ use wasm_bindgen_futures::JsFuture;
 use platform_host::ExplorerPermissionMode;
 
 #[wasm_bindgen(inline_js = r#"
-const DB_NAME = 'retrodesk_os';
+const DB_NAME = 'origin_os';
 const DB_VERSION = 1;
 const APP_STATE_STORE = 'app_state';
 const PREFS_STORE = 'prefs';
 const VFS_STORE = 'vfs_nodes';
 const FS_CONFIG_STORE = 'fs_config';
+const EXPLORER_PREFS_KEY = 'origin.explorer.prefs.v1';
+const LEGACY_EXPLORER_PREFS_KEY = 'retrodesk.explorer.prefs.v1';
+const EXPLORER_CACHE_NAME = 'origin-explorer-cache-v1';
+const LEGACY_EXPLORER_CACHE_NAME = 'retrodesk-explorer-cache-v1';
 
 function fail(message) {
   throw new Error(message);
@@ -230,7 +234,7 @@ async function ensureVfsSeed() {
 { path: '/Documents/welcome.txt', parent: '/Documents', name: 'welcome.txt', kind: 'file', content: 'Virtual file system (IndexedDB)\\n\\nThis explorer works offline and mirrors the native file API shape where possible.\\n', size: 112, createdAt: ts, modifiedAt: ts },
 { path: '/Documents/todo.txt', parent: '/Documents', name: 'todo.txt', kind: 'file', content: '- Connect a local folder (File System Access API)\\n- Edit and save files\\n- Inspect metadata and permissions\\n', size: 111, createdAt: ts, modifiedAt: ts },
 { path: '/Projects', parent: '/', name: 'Projects', kind: 'dir', createdAt: ts, modifiedAt: ts },
-{ path: '/Projects/notes.json', parent: '/Projects', name: 'notes.json', kind: 'file', content: JSON.stringify({ project: 'retrodesk', storage: ['indexeddb', 'cache', 'localstorage', 'memory'] }, null, 2) + '\\n', size: 0, createdAt: ts, modifiedAt: ts },
+{ path: '/Projects/notes.json', parent: '/Projects', name: 'notes.json', kind: 'file', content: JSON.stringify({ project: 'origin', storage: ['indexeddb', 'cache', 'localstorage', 'memory'] }, null, 2) + '\\n', size: 0, createdAt: ts, modifiedAt: ts },
   ];
 
   seed[5].size = bytesLen(seed[5].content);
@@ -527,10 +531,20 @@ root_path_hint: rootName ? `/${rootName}` : null,
 }
 
 function cacheRequestUrl(cacheName, key) {
-  return `https://retrodesk.local/__cache/${encodeURIComponent(cacheName)}/${encodeURIComponent(key)}`;
+  return `https://origin.local/__cache/${encodeURIComponent(cacheName)}/${encodeURIComponent(key)}`;
+}
+
+function canonicalCacheName(cacheName) {
+  return cacheName === LEGACY_EXPLORER_CACHE_NAME ? EXPLORER_CACHE_NAME : cacheName;
+}
+
+function legacyCacheNames(cacheName) {
+  if (cacheName === EXPLORER_CACHE_NAME) return [LEGACY_EXPLORER_CACHE_NAME];
+  return [];
 }
 
 async function cachePutTextInternal(cacheName, key, value) {
+  cacheName = canonicalCacheName(cacheName);
   const tauri = await tauriInvoke('cache_put_text', {
 cacheName,
 cache_name: cacheName,
@@ -548,13 +562,19 @@ fail('Cache API unavailable');
   const res = new Response(value, {
 headers: {
   'content-type': 'text/plain; charset=utf-8',
-  'x-retrodesk-cache-key': key,
+  'x-origin-cache-key': key,
 },
   });
   await cache.put(req, res);
+  for (const legacyName of legacyCacheNames(cacheName)) {
+    const legacyCache = await caches.open(legacyName);
+    const legacyReq = new Request(cacheRequestUrl(legacyName, key), { method: 'GET' });
+    await legacyCache.delete(legacyReq).catch(() => {});
+  }
 }
 
 async function cacheGetTextInternal(cacheName, key) {
+  cacheName = canonicalCacheName(cacheName);
   const tauri = await tauriInvoke('cache_get_text', {
 cacheName,
 cache_name: cacheName,
@@ -569,11 +589,22 @@ fail('Cache API unavailable');
   const cache = await caches.open(cacheName);
   const req = new Request(cacheRequestUrl(cacheName, key), { method: 'GET' });
   const res = await cache.match(req);
-  if (!res) return null;
-  return await res.text();
+  if (res) return await res.text();
+  for (const legacyName of legacyCacheNames(cacheName)) {
+    const legacyCache = await caches.open(legacyName);
+    const legacyReq = new Request(cacheRequestUrl(legacyName, key), { method: 'GET' });
+    const legacyRes = await legacyCache.match(legacyReq);
+    if (!legacyRes) continue;
+    const text = await legacyRes.text();
+    await cachePutTextInternal(cacheName, key, text);
+    await legacyCache.delete(legacyReq).catch(() => {});
+    return text;
+  }
+  return null;
 }
 
 async function cacheDeleteInternal(cacheName, key) {
+  cacheName = canonicalCacheName(cacheName);
   const tauri = await tauriInvoke('cache_delete', {
 cacheName,
 cache_name: cacheName,
@@ -588,6 +619,11 @@ fail('Cache API unavailable');
   const cache = await caches.open(cacheName);
   const req = new Request(cacheRequestUrl(cacheName, key), { method: 'GET' });
   await cache.delete(req);
+  for (const legacyName of legacyCacheNames(cacheName)) {
+    const legacyCache = await caches.open(legacyName);
+    const legacyReq = new Request(cacheRequestUrl(legacyName, key), { method: 'GET' });
+    await legacyCache.delete(legacyReq).catch(() => {});
+  }
 }
 
 async function appStateLoad(namespace) {
@@ -636,29 +672,51 @@ async function appStateNamespaces() {
 }
 
 async function prefsLoad(key) {
+  const canonicalKey = key === LEGACY_EXPLORER_PREFS_KEY ? EXPLORER_PREFS_KEY : key;
   const tauri = await tauriInvoke('prefs_load', { key });
   if (tauri.available) {
     return tauri.value ?? null;
   }
-  const row = await getByKey(PREFS_STORE, key);
-  return row?.raw_json ?? null;
+  const row = await getByKey(PREFS_STORE, canonicalKey);
+  if (row?.raw_json != null) return row.raw_json;
+  if (canonicalKey === EXPLORER_PREFS_KEY) {
+    const legacy = await getByKey(PREFS_STORE, LEGACY_EXPLORER_PREFS_KEY);
+    if (legacy?.raw_json != null) {
+      await putRecord(PREFS_STORE, {
+        key: canonicalKey,
+        raw_json: legacy.raw_json,
+        updated_at_unix_ms: nowMs(),
+      });
+      await deleteByKey(PREFS_STORE, LEGACY_EXPLORER_PREFS_KEY);
+      return legacy.raw_json;
+    }
+  }
+  return null;
 }
 
 async function prefsSave(key, rawJson) {
+  const canonicalKey = key === LEGACY_EXPLORER_PREFS_KEY ? EXPLORER_PREFS_KEY : key;
   const tauri = await tauriInvoke('prefs_save', { key, rawJson, raw_json: rawJson });
   if (tauri.available) {
     return null;
   }
-  await putRecord(PREFS_STORE, { key, raw_json: rawJson, updated_at_unix_ms: nowMs() });
+  await putRecord(PREFS_STORE, { key: canonicalKey, raw_json: rawJson, updated_at_unix_ms: nowMs() });
+  if (canonicalKey === EXPLORER_PREFS_KEY) {
+    await deleteByKey(PREFS_STORE, LEGACY_EXPLORER_PREFS_KEY);
+  }
   return null;
 }
 
 async function prefsDelete(key) {
+  const canonicalKey = key === LEGACY_EXPLORER_PREFS_KEY ? EXPLORER_PREFS_KEY : key;
   const tauri = await tauriInvoke('prefs_delete', { key });
   if (tauri.available) {
     return null;
   }
-  await deleteByKey(PREFS_STORE, key);
+  await deleteByKey(PREFS_STORE, canonicalKey);
+  if (canonicalKey === EXPLORER_PREFS_KEY) {
+    await deleteByKey(PREFS_STORE, LEGACY_EXPLORER_PREFS_KEY);
+  }
   return null;
 }
 
@@ -754,7 +812,7 @@ return tauri.value;
   const status = await nativeStatus();
   if (status.backend !== 'native-fs-access') {
 const result = await vfsReadText(path);
-await cachePutTextInternal('retrodesk-explorer-cache-v1', result.cached_preview_key, result.text);
+await cachePutTextInternal('origin-explorer-cache-v1', result.cached_preview_key, result.text);
 return result;
   }
   const root = await getNativeRootHandle();
@@ -766,7 +824,7 @@ return result;
   const text = await file.text();
   const metadata = await nativeEntryMetadata(normalized, fileHandle, permission);
   const cached_preview_key = `file-preview:${normalized}`;
-  await cachePutTextInternal('retrodesk-explorer-cache-v1', cached_preview_key, text);
+  await cachePutTextInternal('origin-explorer-cache-v1', cached_preview_key, text);
   return {
 backend: 'native-fs-access',
 path: normalized,
@@ -785,7 +843,7 @@ return tauri.value;
   const status = await nativeStatus();
   if (status.backend !== 'native-fs-access') {
 const meta = await vfsWriteText(path, text ?? '');
-await cachePutTextInternal('retrodesk-explorer-cache-v1', `file-preview:${meta.path}`, text ?? '');
+await cachePutTextInternal('origin-explorer-cache-v1', `file-preview:${meta.path}`, text ?? '');
 return meta;
   }
   const root = await getNativeRootHandle();
@@ -798,7 +856,7 @@ return meta;
   await writable.write(text ?? '');
   await writable.close();
   const metadata = await nativeEntryMetadata(normalized, fileHandle, permission);
-  await cachePutTextInternal('retrodesk-explorer-cache-v1', `file-preview:${normalized}`, text ?? '');
+  await cachePutTextInternal('origin-explorer-cache-v1', `file-preview:${normalized}`, text ?? '');
   return metadata;
 }
 
@@ -853,7 +911,7 @@ return null;
   const { parent, name, normalized } = await resolveNativeParentAndName(path);
   if (normalized === '/') fail('Cannot delete root directory');
   await parent.removeEntry(name, { recursive: !!recursive });
-  await cacheDeleteInternal('retrodesk-explorer-cache-v1', `file-preview:${normalized}`).catch(() => {});
+  await cacheDeleteInternal('origin-explorer-cache-v1', `file-preview:${normalized}`).catch(() => {});
   return null;
 }
 

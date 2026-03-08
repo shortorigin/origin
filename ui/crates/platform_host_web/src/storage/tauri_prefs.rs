@@ -43,10 +43,10 @@ mod tests {
         let store_obj: &dyn PrefsStore = &store;
 
         assert_eq!(
-            block_on(store_obj.load_pref("retrodesk.key")).expect("load"),
+            block_on(store_obj.load_pref("origin.key")).expect("load"),
             None
         );
-        block_on(store_obj.save_pref("retrodesk.key", "\"value\"")).expect("save");
-        block_on(store_obj.delete_pref("retrodesk.key")).expect("delete");
+        block_on(store_obj.save_pref("origin.key", "\"value\"")).expect("save");
+        block_on(store_obj.delete_pref("origin.key")).expect("delete");
     }
 }

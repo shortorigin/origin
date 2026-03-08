@@ -150,11 +150,11 @@ mod tests {
     #[test]
     fn prefs_public_api_non_wasm_parity() {
         assert_eq!(
-            block_on(load_pref("retrodesk.explorer.prefs.v1")).expect("load pref"),
+            block_on(load_pref("origin.explorer.prefs.v1")).expect("load pref"),
             None
         );
-        block_on(save_pref("retrodesk.explorer.prefs.v1", "{\"k\":1}")).expect("save pref");
-        block_on(delete_pref("retrodesk.explorer.prefs.v1")).expect("delete pref");
+        block_on(save_pref("origin.explorer.prefs.v1", "{\"k\":1}")).expect("save pref");
+        block_on(delete_pref("origin.explorer.prefs.v1")).expect("delete pref");
     }
 
     #[cfg(not(target_arch = "wasm32"))]

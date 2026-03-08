@@ -2,8 +2,8 @@ use leptos::ev::KeyboardEvent;
 use leptos::*;
 
 use crate::foundation::{
-    bool_token, merge_layout_class, ButtonVariant, Elevation, LayoutGap, LayoutJustify,
-    LayoutPadding, SurfaceVariant,
+    bool_token, merge_layout_class, ButtonVariant, ControlTone, ElevationRole, LayoutGap,
+    LayoutJustify, LayoutPadding, SurfaceRole,
 };
 
 #[component]
@@ -23,8 +23,8 @@ pub fn Toolbar(
             data-origin-component="toolbar"
             data-ui-primitive="true"
             data-ui-kind="toolbar"
-            data-ui-variant=SurfaceVariant::Muted.token()
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=SurfaceRole::WindowInactive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             data-ui-gap=gap.token()
             data-ui-padding=padding.token()
         >
@@ -45,8 +45,8 @@ pub fn StatusBar(
             data-origin-component="status-bar"
             data-ui-primitive="true"
             data-ui-kind="statusbar"
-            data-ui-variant=SurfaceVariant::Muted.token()
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=SurfaceRole::WindowInactive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             data-ui-gap=gap.token()
         >
             {children()}
@@ -94,8 +94,8 @@ pub fn MenuSurface(
             data-origin-component="menu-surface"
             data-ui-primitive="true"
             data-ui-kind="menu-surface"
-            data-ui-variant=SurfaceVariant::Overlay.token()
-            data-ui-elevation=Elevation::Transient.token()
+            data-ui-surface-role=SurfaceRole::Menu.token()
+            data-ui-elevation-role=ElevationRole::Floating.token()
             data-ui-slot=ui_slot
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
@@ -146,6 +146,7 @@ pub fn MenuItem(
             selected=selected
             ui_slot="menu-item"
             variant=variant
+            control_tone=ControlTone::Neutral
             on_mousedown=Callback::new(move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
                     on_mousedown.call(ev);
@@ -196,8 +197,8 @@ pub fn DisclosurePanel(
             data-origin-component="disclosure-panel"
             data-ui-primitive="true"
             data-ui-kind="disclosure"
-            data-ui-variant=SurfaceVariant::Muted.token()
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=SurfaceRole::WindowInactive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             data-ui-state=move || if expanded.get() { "open" } else { "closed" }
             data-ui-expanded=move || bool_token(expanded.get())
         >
@@ -205,6 +206,7 @@ pub fn DisclosurePanel(
                 layout_class="ui-disclosure-toggle"
                 ui_slot="toggle"
                 variant=ButtonVariant::Quiet
+                control_tone=ControlTone::Neutral
                 selected=expanded
                 aria_label=title.to_string()
                 on_click=Callback::new(move |ev| {
@@ -278,8 +280,8 @@ pub fn StepFlowStep(
             data-origin-component="step-flow-step"
             data-ui-primitive="true"
             data-ui-kind="step-flow-step"
-            data-ui-variant=SurfaceVariant::Muted.token()
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=SurfaceRole::WindowInactive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             data-ui-state=move || status.get().token()
         >
             <div data-ui-slot="header">
@@ -346,8 +348,8 @@ pub fn ToggleRow(
             data-origin-component="toggle-row"
             data-ui-primitive="true"
             data-ui-kind="toggle-row"
-            data-ui-variant=SurfaceVariant::Muted.token()
-            data-ui-elevation=Elevation::Raised.token()
+            data-ui-surface-role=SurfaceRole::WindowInactive.token()
+            data-ui-elevation-role=ElevationRole::Raised.token()
             data-ui-selected=move || bool_token(checked.get())
         >
             <span data-ui-slot="copy">
