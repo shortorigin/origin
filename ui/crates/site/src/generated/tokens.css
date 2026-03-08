@@ -143,6 +143,11 @@
   --origin-semantic-state-selected-surface: var(--origin-raw-color-selected);
   --origin-semantic-shell-desktop-icon-tile-size: 80px;
   --origin-semantic-shell-desktop-padding: 12px;
+  --origin-semantic-shell-dock-button-size: 40px;
+  --origin-semantic-shell-dock-floating-offset: 10px;
+  --origin-semantic-shell-dock-height: 46px;
+  --origin-semantic-shell-dock-padding: 6px;
+  --origin-semantic-shell-dock-spacing: 6px;
   --origin-semantic-shell-menu-width: 240px;
   --origin-semantic-shell-notification-width: 360px;
   --origin-semantic-shell-panel-width: 360px;

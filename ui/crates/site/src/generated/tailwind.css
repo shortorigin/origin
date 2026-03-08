@@ -468,10 +468,43 @@ a {
   z-index: var(--origin-semantic-layer-taskbar);
 }
 
+[data-ui-slot="taskbar-overlay"] {
+  position: absolute;
+  left: 50%;
+  bottom: var(--origin-semantic-shell-dock-floating-offset);
+  z-index: var(--origin-semantic-layer-taskbar);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+[data-ui-kind="dock"] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--origin-semantic-shell-dock-spacing);
+  margin: 0;
+  padding: var(--origin-semantic-shell-dock-padding);
+  min-height: var(--origin-semantic-shell-dock-height);
+  width: max-content;
+  max-width: calc(100vw - 20px);
+  border: var(--origin-raw-border-width-1) solid color-mix(in srgb, var(--origin-semantic-surface-taskbar-border) 72%, transparent);
+  border-radius: var(--origin-raw-radius-round);
+  background: color-mix(in srgb, var(--origin-semantic-surface-taskbar-background) 88%, transparent);
+  box-shadow: var(--origin-semantic-layer-floating-shadow);
+  backdrop-filter: blur(var(--origin-semantic-surface-taskbar-blur)) saturate(130%);
+  -webkit-backdrop-filter: blur(var(--origin-semantic-surface-taskbar-blur)) saturate(130%);
+  pointer-events: auto;
+}
+
 [data-ui-kind="taskbar-section"] {
   min-width: 0;
   align-items: center;
   gap: var(--origin-semantic-shell-taskbar-item-gap);
+}
+
+[data-ui-kind="dock-section"] {
+  min-width: 0;
+  align-items: center;
+  gap: var(--origin-semantic-shell-dock-spacing);
 }
 
 [data-ui-kind="taskbar-section"][data-ui-slot="center"] {
@@ -479,6 +512,20 @@ a {
 }
 
 [data-ui-kind="taskbar-section"][data-ui-slot="right"] {
+  justify-content: flex-end;
+}
+
+[data-ui-kind="dock-section"][data-ui-slot="running"] {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+[data-ui-kind="dock-section"][data-ui-slot="left"],
+[data-ui-kind="dock-section"][data-ui-slot="right"] {
+  flex: 0 0 auto;
+}
+
+[data-ui-kind="dock-section"][data-ui-slot="right"] {
   justify-content: flex-end;
 }
 
@@ -498,6 +545,29 @@ a {
 [data-ui-slot="clock-button"] {
   min-width: var(--origin-semantic-shell-taskbar-clock-min-width);
   justify-content: flex-end;
+}
+
+[data-ui-slot="dock-button"],
+[data-ui-slot="dock-launcher-button"],
+[data-ui-slot="dock-overflow-button"] {
+  width: var(--origin-semantic-shell-dock-button-size);
+  min-width: var(--origin-semantic-shell-dock-button-size);
+  min-height: var(--origin-semantic-shell-dock-button-size);
+  padding: 0;
+  border-radius: var(--origin-raw-radius-round);
+}
+
+[data-ui-slot="dock-clock"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--origin-semantic-shell-taskbar-clock-min-width);
+  padding: 0 var(--origin-raw-space-8);
+  font-size: var(--origin-raw-type-size-label);
+  font-weight: var(--origin-raw-type-weight-semibold);
+  letter-spacing: var(--origin-raw-type-tracking-wide);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 [data-ui-kind="tray-list"] {
@@ -746,6 +816,7 @@ a {
   [data-ui-kind="statusbar"],
   [data-ui-kind="menu-surface"],
   [data-ui-kind="taskbar"],
+  [data-ui-kind="dock"],
   [data-ui-kind="window-frame"],
   [data-ui-kind="window-surface"],
   [data-ui-kind="launcher-panel"],

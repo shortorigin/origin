@@ -9,8 +9,9 @@ pub use navigation::{
     StepFlowActions, StepFlowHeader, StepFlowStep, StepStatus, ToggleRow, Toolbar,
 };
 pub use shell::{
-    AppShell, ClockButton, DesktopBackdrop, DesktopIcon, DesktopIconGrid, DesktopWindowLayer,
-    LauncherPanel, NotificationCenter, QuickSettingTile, SidePanel, SystemOverlay, SystemTray,
-    Taskbar, TaskbarButton, TaskbarOverflowButton, TaskbarSection, TrayButton,
+    AppShell, ClockButton, DesktopBackdrop, DesktopIcon, DesktopIconGrid, DesktopWindowLayer, Dock,
+    DockButton, DockSection, LauncherPanel, NotificationCenter, QuickSettingTile, SidePanel,
+    SystemOverlay, SystemTray, Taskbar, TaskbarButton, TaskbarOverflowButton, TaskbarSection,
+    TrayButton,
 };
 pub use windowing::{WindowControls, WindowFrame, WindowTitleBar};
