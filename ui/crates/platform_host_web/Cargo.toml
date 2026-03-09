@@ -1,7 +1,9 @@
 [package]
 name = "platform_host_web"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 
 [features]
 default = []
@@ -9,11 +11,11 @@ desktop-host-stub = []
 desktop-host-tauri = []
 
 [dependencies]
-futures = "0.3"
+futures.workspace = true
 js-sys = "0.3"
 platform_host = { path = "../platform_host" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
