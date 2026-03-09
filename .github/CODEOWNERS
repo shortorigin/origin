@@ -1,1 +1,19 @@
-* @shortorigin/core-maintainers
+/README.md @justinrayshort @SandCodes
+/ARCHITECTURE.md @justinrayshort @SandCodes
+/CONTRIBUTING.md @justinrayshort @SandCodes
+/DEVELOPMENT_MODEL.md @justinrayshort @SandCodes
+/AGENTS.md @justinrayshort @SandCodes
+/.github/ @justinrayshort @SandCodes
+/docs/architecture/ @justinrayshort @SandCodes
+/docs/process/ @justinrayshort @SandCodes
+/enterprise/ @justinrayshort @SandCodes
+/schemas/ @justinrayshort @SandCodes
+/shared/ @justinrayshort @SandCodes
+/platform/ @justinrayshort @SandCodes
+/services/ @justinrayshort @SandCodes
+/workflows/ @justinrayshort @SandCodes
+/ui/ @justinrayshort @SandCodes
+/infrastructure/ @justinrayshort @SandCodes
+/agents/ @justinrayshort @SandCodes
+/testing/ @justinrayshort @SandCodes
+/xtask/ @justinrayshort @SandCodes
