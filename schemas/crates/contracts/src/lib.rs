@@ -1,9 +1,13 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use identity::{ActorRef, InstitutionalRole};
+use identity::{
+    ActionId, ActorRef, AggregateId, DecisionId, EnvironmentId, EvidenceId, InstitutionalRole,
+    ServiceId, WorkflowId,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use telemetry::DecisionRef;
 use uuid::Uuid;
 
 mod knowledge;
@@ -44,8 +48,8 @@ pub struct PayloadRefV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CommandV1 {
     pub command_id: String,
-    pub target_service: String,
-    pub target_aggregate: String,
+    pub target_service: ServiceId,
+    pub target_aggregate: AggregateId,
     pub actor_ref: ActorRef,
     pub authority_ref: String,
     pub classification: Classification,
@@ -55,7 +59,7 @@ pub struct CommandV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueryV1 {
     pub query_id: String,
-    pub target_service: String,
+    pub target_service: ServiceId,
     pub actor_ref: ActorRef,
     pub purpose: String,
     pub classification: Classification,
@@ -64,11 +68,11 @@ pub struct QueryV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PolicyDecisionRequestV1 {
-    pub request_id: String,
+    pub request_id: ActionId,
     pub actor_ref: ActorRef,
-    pub action: String,
-    pub resource: String,
-    pub environment: String,
+    pub action: WorkflowId,
+    pub resource: ServiceId,
+    pub environment: EnvironmentId,
     pub impact_tier: ImpactTier,
     pub classification: Classification,
     pub cross_domain: bool,
@@ -78,18 +82,18 @@ pub struct PolicyDecisionRequestV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PolicyDecisionV1 {
-    pub decision_id: String,
-    pub request_id: String,
+    pub decision_id: DecisionId,
+    pub request_id: ActionId,
     pub decision: PolicyDecisionOutcome,
     pub obligations: Vec<String>,
     pub denial_reasons: Vec<String>,
-    pub evidence_refs: Vec<String>,
+    pub evidence_refs: Vec<EvidenceId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApprovalRequestV1 {
-    pub action_id: String,
-    pub approval_scope: String,
+    pub action_id: ActionId,
+    pub approval_scope: WorkflowId,
     pub required_approver_roles: Vec<InstitutionalRole>,
     pub minimum_approvals: usize,
     pub impact_tier: ImpactTier,
@@ -112,7 +116,7 @@ impl ApprovalRequestV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApprovalDecisionV1 {
-    pub action_id: String,
+    pub action_id: ActionId,
     pub approver: ActorRef,
     pub approver_role: InstitutionalRole,
     pub approved: bool,
@@ -145,21 +149,21 @@ pub struct RiskRecordV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EvidenceManifestV1 {
-    pub evidence_id: String,
+    pub evidence_id: EvidenceId,
     pub producer: String,
     pub artifact_hash: String,
     pub storage_ref: String,
     pub retention_class: String,
     pub classification: Classification,
-    pub related_decision_refs: Vec<String>,
+    pub related_decision_refs: Vec<DecisionRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentActionRequestV1 {
-    pub action_id: String,
+    pub action_id: ActionId,
     pub actor_ref: ActorRef,
     pub objective: String,
-    pub requested_workflow: String,
+    pub requested_workflow: WorkflowId,
     pub impact_tier: ImpactTier,
     pub classification: Classification,
     pub required_approver_roles: Vec<InstitutionalRole>,
@@ -389,15 +393,20 @@ impl TreasuryDisbursementRecordedV1 {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum VenueV1 {
+    #[serde(alias = "Coinbase")]
     Coinbase,
+    #[serde(alias = "Oanda")]
     Oanda,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetClassV1 {
+    #[serde(alias = "Crypto")]
     Crypto,
+    #[serde(alias = "Forex")]
     Forex,
+    #[serde(alias = "Equity")]
     Equity,
 }
 
@@ -544,8 +553,11 @@ pub struct StrategyConfigV1 {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SignalSideV1 {
+    #[serde(alias = "Buy")]
     Buy,
+    #[serde(alias = "Sell")]
     Sell,
+    #[serde(alias = "Hold")]
     Hold,
 }
 
@@ -613,22 +625,29 @@ pub struct MarketDataBatchV1 {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderSideV1 {
+    #[serde(alias = "Buy")]
     Buy,
+    #[serde(alias = "Sell")]
     Sell,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderTypeV1 {
+    #[serde(alias = "Market")]
     Market,
+    #[serde(alias = "Limit")]
     Limit,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeInForceV1 {
+    #[serde(alias = "Gtc")]
     Gtc,
+    #[serde(alias = "Ioc")]
     Ioc,
+    #[serde(alias = "Fok")]
     Fok,
 }
 
@@ -756,10 +775,16 @@ pub struct ExperimentConfigV1 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExperimentMetadataV1 {
+    #[serde(default)]
+    pub trade_count: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ExperimentResultV1 {
     pub config_hash: String,
     pub summary: PerformanceSummaryV1,
-    pub metadata: Value,
+    pub metadata: ExperimentMetadataV1,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

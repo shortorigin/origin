@@ -203,14 +203,22 @@ impl ComplianceService {
 
 pub fn validate_compliance_pack(report: &ComplianceReportV1) -> InstitutionalResult<()> {
     if report.daily_control_attestation.controls_checked.is_empty() {
-        return Err(InstitutionalError::InvariantViolation {
-            invariant: "controls_checked cannot be empty".to_string(),
-        });
+        return Err(InstitutionalError::invariant(
+            error_model::OperationContext::new(
+                "services/compliance-service",
+                "validate_compliance_pack",
+            ),
+            "controls_checked cannot be empty",
+        ));
     }
     if report.daily_control_attestation.business_date.is_empty() {
-        return Err(InstitutionalError::InvariantViolation {
-            invariant: "business_date required".to_string(),
-        });
+        return Err(InstitutionalError::invariant(
+            error_model::OperationContext::new(
+                "services/compliance-service",
+                "validate_compliance_pack",
+            ),
+            "business_date required",
+        ));
     }
     Ok(())
 }
@@ -218,18 +226,18 @@ pub fn validate_compliance_pack(report: &ComplianceReportV1) -> InstitutionalRes
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: "compliance-service".to_owned(),
+        service_name: "compliance-service".into(),
         domain: "compliance".to_owned(),
         approved_workflows: vec![
-            "compliance_attestation".to_owned(),
-            "policy_exception".to_owned(),
-            "quant_strategy_promotion".to_owned(),
+            "compliance_attestation".into(),
+            "policy_exception".into(),
+            "quant_strategy_promotion".into(),
         ],
         owned_aggregates: vec![
-            "control_attestation".to_owned(),
-            "compliance_checkpoint".to_owned(),
-            "compliance_pack".to_owned(),
-            "best_execution_report".to_owned(),
+            "control_attestation".into(),
+            "compliance_checkpoint".into(),
+            "compliance_pack".into(),
+            "best_execution_report".into(),
         ],
     }
 }

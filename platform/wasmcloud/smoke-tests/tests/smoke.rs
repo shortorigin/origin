@@ -3,8 +3,8 @@ use lattice_config::{
     RolloutTargetV1,
 };
 use sdk_rs::{
-    InstitutionalPlatformClientV1, InstitutionalPlatformRuntimeClient, MemoryPlatformTransport,
-    ReleasedUiAppV1,
+    InstitutionalPlatformClientV1, InstitutionalPlatformRuntimeClient,
+    LocalHarnessPlatformTransport, ReleasedUiAppV1,
 };
 
 #[tokio::test]
@@ -48,7 +48,7 @@ async fn lattice_config_and_sdk_smoke_round_trip_component_descriptors() {
         ],
         true,
     );
-    let transport = MemoryPlatformTransport::new(dashboard.clone(), Vec::new());
+    let transport = LocalHarnessPlatformTransport::new(dashboard.clone(), Vec::new());
     let client = InstitutionalPlatformRuntimeClient::new(manifest, transport);
 
     let queried = client.query_dashboard().await.expect("dashboard");

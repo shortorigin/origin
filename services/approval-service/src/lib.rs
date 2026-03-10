@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use contracts::{ApprovalDecisionV1, ApprovalRequestV1, ServiceBoundaryV1};
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
+use futures::future::BoxFuture;
+use identity::ActionId;
 use policy_sdk::ApprovalVerificationPort;
 
 const SERVICE_NAME: &str = "approval-service";
@@ -17,7 +19,7 @@ const OWNED_AGGREGATES: &[&str] = &["approval_request", "approval_decision"];
 
 #[derive(Debug, Default, Clone)]
 struct InMemoryApprovalStore {
-    approvals: BTreeMap<String, Vec<ApprovalDecisionV1>>,
+    approvals: BTreeMap<ActionId, Vec<ApprovalDecisionV1>>,
 }
 
 impl InMemoryApprovalStore {
@@ -28,7 +30,7 @@ impl InMemoryApprovalStore {
             .push(decision);
     }
 
-    fn decisions_for(&self, action_id: &str) -> Vec<ApprovalDecisionV1> {
+    fn decisions_for(&self, action_id: &ActionId) -> Vec<ApprovalDecisionV1> {
         self.approvals.get(action_id).cloned().unwrap_or_default()
     }
 }
@@ -45,51 +47,57 @@ impl ApprovalService {
 }
 
 impl ApprovalVerificationPort for ApprovalService {
-    fn verify(&self, request: &ApprovalRequestV1) -> InstitutionalResult<Vec<ApprovalDecisionV1>> {
-        if request.required_approval_count() == 0 {
-            return Ok(Vec::new());
-        }
+    fn verify(
+        &self,
+        request: &ApprovalRequestV1,
+    ) -> BoxFuture<'_, InstitutionalResult<Vec<ApprovalDecisionV1>>> {
+        let request = request.clone();
+        Box::pin(async move {
+            if request.required_approval_count() == 0 {
+                return Ok(Vec::new());
+            }
 
-        let decisions = self
-            .store
-            .decisions_for(&request.action_id)
-            .into_iter()
-            .filter(|decision| decision.approved && decision.decided_at <= request.expires_at)
-            .collect::<Vec<_>>();
+            let decisions = self
+                .store
+                .decisions_for(&request.action_id)
+                .into_iter()
+                .filter(|decision| decision.approved && decision.decided_at <= request.expires_at)
+                .collect::<Vec<_>>();
 
-        let approved_roles = decisions
-            .iter()
-            .map(|decision| decision.approver_role)
-            .collect::<BTreeSet<_>>();
+            let approved_roles = decisions
+                .iter()
+                .map(|decision| decision.approver_role)
+                .collect::<BTreeSet<_>>();
 
-        let minimum_met = decisions.len() >= request.required_approval_count();
-        let roles_met = request
-            .required_approver_roles
-            .iter()
-            .all(|role| approved_roles.contains(role));
+            let minimum_met = decisions.len() >= request.required_approval_count();
+            let roles_met = request
+                .required_approver_roles
+                .iter()
+                .all(|role| approved_roles.contains(role));
 
-        if minimum_met && roles_met {
-            Ok(decisions)
-        } else {
-            Err(InstitutionalError::ApprovalMissing {
-                action: request.action_id.clone(),
-            })
-        }
+            if minimum_met && roles_met {
+                Ok(decisions)
+            } else {
+                Err(InstitutionalError::approval_denied(
+                    OperationContext::new("services/approval-service", "verify")
+                        .with_workflow_id(request.approval_scope.clone())
+                        .with_correlation_id(request.action_id.as_str()),
+                    format!(
+                        "missing required approvals for action `{}` within workflow `{}`",
+                        request.action_id, request.approval_scope
+                    ),
+                ))
+            }
+        })
     }
 }
 
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: SERVICE_NAME.to_owned(),
+        service_name: SERVICE_NAME.into(),
         domain: DOMAIN_NAME.to_owned(),
-        approved_workflows: APPROVED_WORKFLOWS
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-        owned_aggregates: OWNED_AGGREGATES
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        approved_workflows: APPROVED_WORKFLOWS.iter().copied().map(Into::into).collect(),
+        owned_aggregates: OWNED_AGGREGATES.iter().copied().map(Into::into).collect(),
     }
 }

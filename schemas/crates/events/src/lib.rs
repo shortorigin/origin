@@ -5,6 +5,7 @@ use contracts::{
 };
 use identity::ActorRef;
 use serde::{Deserialize, Serialize};
+use telemetry::{CausationId, CorrelationId, DecisionRef};
 use uuid::Uuid;
 
 mod knowledge;
@@ -19,9 +20,9 @@ pub struct EventEnvelopeV1 {
     pub actor_ref: ActorRef,
     pub occurred_at: DateTime<Utc>,
     pub recorded_at: DateTime<Utc>,
-    pub correlation_id: String,
-    pub causation_id: Option<String>,
-    pub decision_ref: Option<String>,
+    pub correlation_id: CorrelationId,
+    pub causation_id: Option<CausationId>,
+    pub decision_ref: Option<DecisionRef>,
     pub classification: Classification,
     pub schema_ref: String,
     pub integrity_hash: String,
@@ -32,8 +33,8 @@ impl EventEnvelopeV1 {
     pub fn new(
         event_type: impl Into<String>,
         actor_ref: ActorRef,
-        correlation_id: impl Into<String>,
-        decision_ref: Option<String>,
+        correlation_id: impl Into<CorrelationId>,
+        decision_ref: Option<DecisionRef>,
         classification: Classification,
         schema_ref: impl Into<String>,
         integrity_hash: impl Into<String>,

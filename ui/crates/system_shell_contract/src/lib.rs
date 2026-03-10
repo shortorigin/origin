@@ -568,6 +568,15 @@ pub struct ShellExecutionSummary {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ExecutionId(pub u64);
 
+/// Sequenced shell stream event retained in a bounded session log.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequencedShellStreamEvent {
+    /// Monotonic session-local sequence number.
+    pub sequence: u64,
+    /// Event payload.
+    pub event: ShellStreamEvent,
+}
+
 /// Shell exit status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ShellExit {
@@ -618,6 +627,19 @@ pub struct ShellError {
     pub code: ShellErrorCode,
     /// Human-readable message.
     pub message: String,
+}
+
+/// Submission-time shell rejection with a typed reason.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "reason", rename_all = "kebab-case")]
+pub enum ShellSubmitError {
+    /// Another execution already owns the foreground slot.
+    Busy {
+        /// Active execution blocking the new request.
+        active_execution: ExecutionId,
+    },
+    /// The request did not contain an executable command.
+    EmptyRequest,
 }
 
 impl ShellError {

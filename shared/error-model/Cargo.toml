@@ -6,7 +6,9 @@ publish.workspace = true
 version.workspace = true
 
 [dependencies]
+identity = { path = "../identity" }
 serde.workspace = true
+telemetry = { path = "../telemetry" }
 thiserror.workspace = true
 
 [lints]

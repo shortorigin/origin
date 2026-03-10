@@ -11,6 +11,7 @@ enforcement = { path = "../enforcement" }
 error-model = { path = "../../../shared/error-model" }
 evidence-sdk = { path = "../../../shared/evidence-sdk" }
 policy-sdk = { path = "../../../shared/policy-sdk" }
+tokio.workspace = true
 
 [lints]
 workspace = true

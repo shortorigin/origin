@@ -13,5 +13,8 @@ rand.workspace = true
 trading-core = { path = "../../shared/trading-core" }
 trading-errors = { path = "../../shared/trading-errors" }
 
+[dev-dependencies]
+toml.workspace = true
+
 [lints]
 workspace = true

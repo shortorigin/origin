@@ -19,10 +19,13 @@ use system_shell_contract::{
     CommandDataShape, CommandDescriptor, CommandInputShape, CommandNotice, CommandNoticeLevel,
     CommandPath, CommandRegistrationToken, CommandResult, CommandScope, CommandVisibility,
     CompletionItem, CompletionRequest, DisplayPreference, ExecutionId, ParsedCommandLine,
-    ParsedInvocation, ParsedLiteral, ParsedOption, ParsedValue, ShellError, ShellErrorCode,
-    ShellExecutionSummary, ShellExit, ShellRequest, ShellStreamEvent, StructuredData,
-    StructuredRecord, StructuredScalar, StructuredTable, StructuredValue,
+    ParsedInvocation, ParsedLiteral, ParsedOption, ParsedValue, SequencedShellStreamEvent,
+    ShellError, ShellErrorCode, ShellExecutionSummary, ShellExit, ShellRequest, ShellStreamEvent,
+    ShellSubmitError, StructuredData, StructuredRecord, StructuredScalar, StructuredTable,
+    StructuredValue,
 };
+
+const MAX_SESSION_EVENTS: usize = 256;
 
 /// Async completion provider.
 pub type CompletionHandler = Rc<
@@ -103,12 +106,20 @@ impl CommandExecutionContext {
 
 #[derive(Clone)]
 struct EventEmitter {
-    events: RwSignal<Vec<ShellStreamEvent>>,
+    events: RwSignal<Vec<SequencedShellStreamEvent>>,
+    next_sequence: Rc<Cell<u64>>,
 }
 
 impl EventEmitter {
     fn push(&self, event: ShellStreamEvent) {
-        self.events.update(|events| events.push(event));
+        self.events.update(|events| {
+            let sequence = self.next_sequence.get().saturating_add(1);
+            self.next_sequence.set(sequence);
+            if events.len() == MAX_SESSION_EVENTS {
+                events.remove(0);
+            }
+            events.push(SequencedShellStreamEvent { sequence, event });
+        });
     }
 
     fn notice(&self, execution_id: ExecutionId, notice: CommandNotice) {
@@ -226,9 +237,10 @@ impl Drop for CommandRegistryHandle {
 #[derive(Clone)]
 struct SessionState {
     cwd: RwSignal<String>,
-    events: RwSignal<Vec<ShellStreamEvent>>,
+    events: RwSignal<Vec<SequencedShellStreamEvent>>,
     active_execution: RwSignal<Option<ExecutionId>>,
     next_execution_id: Rc<Cell<u64>>,
+    next_event_sequence: Rc<Cell<u64>>,
     cancel_flag: Rc<Cell<bool>>,
 }
 
@@ -241,7 +253,7 @@ pub struct ShellSessionHandle {
 
 impl ShellSessionHandle {
     /// Reactive stream event log for this session.
-    pub fn events(&self) -> ReadSignal<Vec<ShellStreamEvent>> {
+    pub fn events(&self) -> ReadSignal<Vec<SequencedShellStreamEvent>> {
         self.state.events.read_only()
     }
 
@@ -272,50 +284,43 @@ impl ShellSessionHandle {
     }
 
     /// Parses and executes one command request.
-    pub fn submit(&self, request: ShellRequest) {
-        if self.state.active_execution.get_untracked().is_some() {
-            self.state.events.update(|events| {
-                events.push(ShellStreamEvent::Notice {
-                    execution_id: ExecutionId(0),
-                    notice: CommandNotice {
-                        level: CommandNoticeLevel::Warning,
-                        message: "another command is already running".to_string(),
-                    },
-                });
-            });
-            return;
+    pub fn submit(&self, request: ShellRequest) -> Result<ExecutionId, ShellSubmitError> {
+        if let Some(active_execution) = self.state.active_execution.get_untracked() {
+            return Err(ShellSubmitError::Busy { active_execution });
         }
 
         let parsed = match parse_command_line(&request.line) {
             Ok(parsed) => parsed,
             Err(err) => {
                 let execution_id = self.next_execution_id();
-                self.state.events.update(|events| {
-                    events.push(ShellStreamEvent::Started { execution_id });
-                    events.push(ShellStreamEvent::Notice {
-                        execution_id,
-                        notice: CommandNotice {
-                            level: CommandNoticeLevel::Error,
-                            message: err.message.clone(),
-                        },
-                    });
-                    events.push(ShellStreamEvent::Completed {
-                        summary: ShellExecutionSummary {
-                            execution_id,
-                            command_path: None,
-                            exit: ShellExit {
-                                code: err.exit_code(),
-                                message: Some(err.message),
-                            },
-                        },
-                    });
+                let emitter = EventEmitter {
+                    events: self.state.events,
+                    next_sequence: self.state.next_event_sequence.clone(),
+                };
+                emitter.push(ShellStreamEvent::Started { execution_id });
+                emitter.push(ShellStreamEvent::Notice {
+                    execution_id,
+                    notice: CommandNotice {
+                        level: CommandNoticeLevel::Error,
+                        message: err.message.clone(),
+                    },
                 });
-                return;
+                emitter.push(ShellStreamEvent::Completed {
+                    summary: ShellExecutionSummary {
+                        execution_id,
+                        command_path: None,
+                        exit: ShellExit {
+                            code: err.exit_code(),
+                            message: Some(err.message),
+                        },
+                    },
+                });
+                return Ok(execution_id);
             }
         };
 
         if parsed.pipeline.is_empty() {
-            return;
+            return Err(ShellSubmitError::EmptyRequest);
         }
 
         let execution_id = self.next_execution_id();
@@ -326,6 +331,7 @@ impl ShellSessionHandle {
         leptos::spawn_local(async move {
             let emitter = EventEmitter {
                 events: state.events,
+                next_sequence: state.next_event_sequence.clone(),
             };
             emitter.push(ShellStreamEvent::Started { execution_id });
 
@@ -471,6 +477,7 @@ impl ShellSessionHandle {
             });
             state.active_execution.set(None);
         });
+        Ok(execution_id)
     }
 
     fn next_execution_id(&self) -> ExecutionId {
@@ -1064,6 +1071,7 @@ impl ShellEngine {
             events: create_rw_signal(Vec::new()),
             active_execution: create_rw_signal(None),
             next_execution_id: Rc::new(Cell::new(0)),
+            next_event_sequence: Rc::new(Cell::new(0)),
             cancel_flag: Rc::new(Cell::new(false)),
         };
         ShellSessionHandle {
@@ -1139,5 +1147,71 @@ mod tests {
         assert_eq!(parsed.pipeline.len(), 2);
         assert_eq!(parsed.pipeline[0].tokens, vec!["ls"]);
         assert_eq!(parsed.pipeline[1].tokens, vec!["data", "select", "name"]);
+    }
+
+    #[test]
+    fn submit_rejects_when_busy_without_emitting_placeholder_events() {
+        let _ = leptos::create_runtime();
+        let engine = ShellEngine::new();
+        let session = engine.new_session("~/desktop");
+        session.state.active_execution.set(Some(ExecutionId(7)));
+
+        let error = session
+            .submit(ShellRequest {
+                line: "apps list".to_string(),
+                cwd: "~/desktop".to_string(),
+                source_window_id: None,
+            })
+            .expect_err("busy submission should be rejected");
+
+        assert_eq!(
+            error,
+            ShellSubmitError::Busy {
+                active_execution: ExecutionId(7),
+            }
+        );
+        assert!(session.events().get_untracked().is_empty());
+    }
+
+    #[test]
+    fn event_log_is_bounded_and_monotonic() {
+        let _ = leptos::create_runtime();
+        let engine = ShellEngine::new();
+        let session = engine.new_session("~/desktop");
+        let emitter = EventEmitter {
+            events: session.state.events,
+            next_sequence: session.state.next_event_sequence.clone(),
+        };
+
+        for index in 0..(MAX_SESSION_EVENTS + 8) {
+            emitter.notice(
+                ExecutionId(1),
+                CommandNotice {
+                    level: CommandNoticeLevel::Info,
+                    message: format!("event-{index}"),
+                },
+            );
+        }
+
+        let events = session.events().get_untracked();
+        assert_eq!(events.len(), MAX_SESSION_EVENTS);
+        assert_eq!(events.first().map(|event| event.sequence), Some(9));
+        assert_eq!(
+            events.first().and_then(|event| match &event.event {
+                ShellStreamEvent::Notice { notice, .. } => Some(notice.message.as_str()),
+                _ => None,
+            }),
+            Some("event-8")
+        );
+        assert_eq!(
+            events.last().and_then(|event| match &event.event {
+                ShellStreamEvent::Notice { notice, .. } => Some(notice.message.as_str()),
+                _ => None,
+            }),
+            Some("event-263")
+        );
+        assert!(events
+            .windows(2)
+            .all(|window| window[0].sequence + 1 == window[1].sequence));
     }
 }

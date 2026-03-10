@@ -9,6 +9,10 @@ version.workspace = true
 contracts = { path = "../../schemas/crates/contracts" }
 enforcement = { path = "../../platform/runtime/enforcement" }
 error-model = { path = "../../shared/error-model" }
+identity = { path = "../../shared/identity" }
+
+[dev-dependencies]
+toml.workspace = true
 
 [lints]
 workspace = true

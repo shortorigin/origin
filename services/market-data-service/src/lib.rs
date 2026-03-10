@@ -5,7 +5,7 @@ use contracts::{
     AssetClassV1, HealthStatusV1, HistoricalDataRequestV1, MarketDataBatchV1, MarketEventV1,
     OhlcvBarV1, RawMarketRecordV1, ServiceBoundaryV1, SymbolV1, TradeTickV1, VenueV1,
 };
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use trading_core::{Clock, IdGenerator, MarketDataAdapter, SystemClock};
@@ -79,9 +79,10 @@ impl MarketDataService {
         events: Vec<MarketEventV1>,
     ) -> InstitutionalResult<MarketDataBatchV1> {
         let Some(start_time) = events.first().map(MarketEventV1::event_time) else {
-            return Err(InstitutionalError::InvariantViolation {
-                invariant: "market data batch requires at least one event".to_string(),
-            });
+            return Err(InstitutionalError::invariant(
+                OperationContext::new("services/market-data-service", "register_batch"),
+                "market data batch requires at least one event",
+            ));
         };
         let end_time = events.last().map_or(start_time, MarketEventV1::event_time);
 
@@ -333,16 +334,21 @@ impl Default for OandaAdapter {
 
 #[cfg(test)]
 mod tests {
+    mod contract_parity {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testing/contract_parity.rs"
+        ));
+    }
+
     use std::sync::Arc;
 
     use chrono::{Duration, TimeZone, Utc};
+    use contract_parity::assert_service_boundary_matches_catalog;
     use contracts::{AssetClassV1, HistoricalDataRequestV1, RawMarketRecordV1, SymbolV1, VenueV1};
     use trading_core::{FixedClock, MarketDataAdapter, SequenceIdGenerator};
 
-    use super::{
-        service_boundary, CoinbaseAdapter, MarketDataService, OandaAdapter, APPROVED_WORKFLOWS,
-        DOMAIN_NAME, OWNED_AGGREGATES, SERVICE_NAME,
-    };
+    use super::{service_boundary, CoinbaseAdapter, MarketDataService, OandaAdapter, DOMAIN_NAME};
 
     #[test]
     fn service_boundary_matches_enterprise_catalog() {
@@ -351,14 +357,7 @@ mod tests {
         );
         let boundary = service_boundary();
 
-        assert_eq!(boundary.service_name, SERVICE_NAME);
-        assert_eq!(boundary.domain, DOMAIN_NAME);
-        for workflow in APPROVED_WORKFLOWS {
-            assert!(source.contains(workflow));
-        }
-        for aggregate in OWNED_AGGREGATES {
-            assert!(source.contains(aggregate));
-        }
+        assert_service_boundary_matches_catalog(&boundary, DOMAIN_NAME, source);
     }
 
     #[test]

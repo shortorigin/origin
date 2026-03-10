@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use system_shell_contract::{
     CommandNotice, CompletionItem as ShellCompletionItem, CompletionRequest, DisplayPreference,
-    ExecutionId, ShellRequest, ShellStreamEvent, StructuredData, StructuredRecord,
-    StructuredScalar, StructuredTable, StructuredValue,
+    ExecutionId, ShellRequest, ShellStreamEvent, ShellSubmitError, StructuredData,
+    StructuredRecord, StructuredScalar, StructuredTable, StructuredValue,
 };
 use system_ui::components::AppShell;
 use system_ui::primitives::{
@@ -110,6 +110,14 @@ fn normalize_terminal_transcript(transcript: &mut Vec<TerminalTranscriptEntry>) 
     }
 }
 
+fn push_terminal_entry(
+    transcript: &mut Vec<TerminalTranscriptEntry>,
+    entry: TerminalTranscriptEntry,
+) {
+    transcript.push(entry);
+    normalize_terminal_transcript(transcript);
+}
+
 fn restore_terminal_state(
     mut restored: TerminalPersistedState,
     launch_cwd: &str,
@@ -125,6 +133,90 @@ fn restore_terminal_state(
     }
     normalize_terminal_transcript(&mut restored.transcript);
     restored
+}
+
+fn apply_shell_session_events(
+    transcript: &mut Vec<TerminalTranscriptEntry>,
+    active_execution: &mut Option<PersistedExecutionState>,
+    pending_command: &mut Option<String>,
+    already_processed: u64,
+    events: &[system_shell_contract::SequencedShellStreamEvent],
+) -> u64 {
+    let Some(last_event) = events.last() else {
+        return already_processed;
+    };
+    if already_processed >= last_event.sequence {
+        return already_processed;
+    }
+
+    if let Some(first_event) = events.first() {
+        let expected_next = already_processed.saturating_add(1);
+        if expected_next < first_event.sequence {
+            push_terminal_entry(
+                transcript,
+                TerminalTranscriptEntry::System {
+                    text: "Older shell session events were evicted from the in-memory log."
+                        .to_string(),
+                },
+            );
+        }
+    }
+
+    for event in events
+        .iter()
+        .filter(|event| event.sequence > already_processed)
+    {
+        match &event.event {
+            ShellStreamEvent::Started { execution_id } => {
+                if let Some(command) = pending_command.take().filter(|command| !command.is_empty())
+                {
+                    *active_execution = Some(PersistedExecutionState {
+                        execution_id: *execution_id,
+                        command,
+                    });
+                }
+            }
+            ShellStreamEvent::Notice {
+                execution_id,
+                notice,
+            } => push_terminal_entry(
+                transcript,
+                TerminalTranscriptEntry::Notice {
+                    notice: notice.clone(),
+                    execution_id: *execution_id,
+                },
+            ),
+            ShellStreamEvent::Data {
+                execution_id,
+                data,
+                display,
+            } => push_terminal_entry(
+                transcript,
+                TerminalTranscriptEntry::Data {
+                    data: data.clone(),
+                    display: *display,
+                    execution_id: *execution_id,
+                },
+            ),
+            ShellStreamEvent::Progress {
+                execution_id,
+                value,
+                label,
+            } => push_terminal_entry(
+                transcript,
+                TerminalTranscriptEntry::Progress {
+                    execution_id: *execution_id,
+                    value: *value,
+                    label: label.clone(),
+                },
+            ),
+            ShellStreamEvent::Cancelled { .. } | ShellStreamEvent::Completed { .. } => {
+                *active_execution = None;
+            }
+        }
+    }
+
+    last_event.sequence
 }
 
 fn should_auto_follow(
@@ -345,7 +437,7 @@ pub fn TerminalApp(
     let suggestions = create_rw_signal(Vec::<ShellCompletionItem>::new());
     let history_cursor = create_rw_signal::<Option<usize>>(None);
     let active_execution = create_rw_signal::<Option<PersistedExecutionState>>(None);
-    let processed_events = create_rw_signal(0usize);
+    let processed_events = create_rw_signal(0u64);
     let pending_command = create_rw_signal::<Option<String>>(None);
     let hydrated = create_rw_signal(false);
     let last_saved = create_rw_signal::<Option<String>>(None);
@@ -424,66 +516,24 @@ pub fn TerminalApp(
         create_effect(move |_| {
             let events = shell_session.events.get();
             let already_processed = processed_events.get();
-            if already_processed >= events.len() {
+            let mut transcript_entries = transcript.get_untracked();
+            let mut active = active_execution.get_untracked();
+            let mut pending = pending_command.get_untracked();
+            let next_processed = apply_shell_session_events(
+                &mut transcript_entries,
+                &mut active,
+                &mut pending,
+                already_processed,
+                &events,
+            );
+            if next_processed == already_processed {
                 return;
             }
 
-            for event in events.iter().skip(already_processed) {
-                match event {
-                    ShellStreamEvent::Started { execution_id } => {
-                        let command = pending_command.get_untracked().unwrap_or_default();
-                        if !command.is_empty() {
-                            active_execution.set(Some(PersistedExecutionState {
-                                execution_id: *execution_id,
-                                command,
-                            }));
-                            pending_command.set(None);
-                        }
-                    }
-                    ShellStreamEvent::Notice {
-                        execution_id,
-                        notice,
-                    } => transcript.update(|entries| {
-                        entries.push(TerminalTranscriptEntry::Notice {
-                            notice: notice.clone(),
-                            execution_id: *execution_id,
-                        });
-                        normalize_terminal_transcript(entries);
-                    }),
-                    ShellStreamEvent::Data {
-                        execution_id,
-                        data,
-                        display,
-                    } => transcript.update(|entries| {
-                        entries.push(TerminalTranscriptEntry::Data {
-                            data: data.clone(),
-                            display: *display,
-                            execution_id: *execution_id,
-                        });
-                        normalize_terminal_transcript(entries);
-                    }),
-                    ShellStreamEvent::Progress {
-                        execution_id,
-                        value,
-                        label,
-                    } => transcript.update(|entries| {
-                        entries.push(TerminalTranscriptEntry::Progress {
-                            execution_id: *execution_id,
-                            value: *value,
-                            label: label.clone(),
-                        });
-                        normalize_terminal_transcript(entries);
-                    }),
-                    ShellStreamEvent::Cancelled { .. } => {
-                        active_execution.set(None);
-                    }
-                    ShellStreamEvent::Completed { .. } => {
-                        active_execution.set(None);
-                    }
-                }
-            }
-
-            processed_events.set(events.len());
+            transcript.set(transcript_entries);
+            active_execution.set(active);
+            pending_command.set(pending);
+            processed_events.set(next_processed);
             cwd.set(shell_session.cwd.get());
         });
     }
@@ -531,12 +581,26 @@ pub fn TerminalApp(
 
             match shell_session.clone() {
                 Some(shell_session) => {
-                    pending_command.set(Some(command.clone()));
-                    shell_session.submit(ShellRequest {
-                        line: command,
+                    let request = ShellRequest {
+                        line: command.clone(),
                         cwd: cwd.get_untracked(),
                         source_window_id: None,
-                    });
+                    };
+                    match shell_session.submit(request) {
+                        Ok(_) => pending_command.set(Some(command.clone())),
+                        Err(ShellSubmitError::Busy { active_execution }) => {
+                            transcript.update(|entries| {
+                                entries.push(TerminalTranscriptEntry::System {
+                                    text: format!(
+                                        "Another command is already running (execution {}).",
+                                        active_execution.0
+                                    ),
+                                });
+                                normalize_terminal_transcript(entries);
+                            });
+                        }
+                        Err(ShellSubmitError::EmptyRequest) => {}
+                    }
                 }
                 None => transcript.update(|entries| {
                     entries.push(TerminalTranscriptEntry::System {
@@ -702,5 +766,105 @@ pub fn TerminalApp(
                 </TerminalTranscript>
             </TerminalSurface>
         </AppShell>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use system_shell_contract::{CommandNoticeLevel, ShellExecutionSummary, ShellExit};
+
+    fn system_texts(transcript: &[TerminalTranscriptEntry]) -> Vec<&str> {
+        transcript
+            .iter()
+            .filter_map(|entry| match entry {
+                TerminalTranscriptEntry::System { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn restore_terminal_state_marks_interrupted_execution_and_bounds_history() {
+        let transcript = (0..MAX_TERMINAL_ENTRIES)
+            .map(|index| TerminalTranscriptEntry::System {
+                text: format!("entry-{index}"),
+            })
+            .collect::<Vec<_>>();
+        let restored = restore_terminal_state(
+            TerminalPersistedState {
+                cwd: String::new(),
+                input: "ls".to_string(),
+                transcript,
+                history_cursor: None,
+                active_execution: Some(PersistedExecutionState {
+                    execution_id: ExecutionId(9),
+                    command: "ls".to_string(),
+                }),
+            },
+            "~/desktop",
+        );
+
+        assert_eq!(restored.cwd, "~/desktop");
+        assert!(restored.active_execution.is_none());
+        assert_eq!(restored.transcript.len(), MAX_TERMINAL_ENTRIES);
+        assert_eq!(
+            restored.transcript.last(),
+            Some(&TerminalTranscriptEntry::System {
+                text: "Previous command interrupted during restore.".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn apply_shell_session_events_reports_eviction_and_tracks_sequences() {
+        let mut transcript = default_terminal_transcript();
+        let mut active_execution = None;
+        let mut pending_command = Some("help list".to_string());
+        let processed = apply_shell_session_events(
+            &mut transcript,
+            &mut active_execution,
+            &mut pending_command,
+            2,
+            &[
+                system_shell_contract::SequencedShellStreamEvent {
+                    sequence: 5,
+                    event: ShellStreamEvent::Started {
+                        execution_id: ExecutionId(41),
+                    },
+                },
+                system_shell_contract::SequencedShellStreamEvent {
+                    sequence: 6,
+                    event: ShellStreamEvent::Notice {
+                        execution_id: ExecutionId(41),
+                        notice: CommandNotice {
+                            level: CommandNoticeLevel::Info,
+                            message: "listing help".to_string(),
+                        },
+                    },
+                },
+                system_shell_contract::SequencedShellStreamEvent {
+                    sequence: 7,
+                    event: ShellStreamEvent::Completed {
+                        summary: ShellExecutionSummary {
+                            execution_id: ExecutionId(41),
+                            command_path: None,
+                            exit: ShellExit::success(),
+                        },
+                    },
+                },
+            ],
+        );
+
+        assert_eq!(processed, 7);
+        assert!(active_execution.is_none());
+        assert!(pending_command.is_none());
+        assert!(system_texts(&transcript)
+            .contains(&"Older shell session events were evicted from the in-memory log."));
+        assert!(transcript.iter().any(|entry| matches!(
+            entry,
+            TerminalTranscriptEntry::Notice { execution_id, notice }
+                if *execution_id == ExecutionId(41) && notice.message == "listing help"
+        )));
     }
 }

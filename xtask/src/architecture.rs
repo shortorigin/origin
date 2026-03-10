@@ -241,9 +241,7 @@ fn audit_member(workspace_root: &Path, member: &str) -> Result<MemberAudit, Stri
     })
 }
 
-fn collect_manifest_declarations(
-    manifest: &toml::Value,
-) -> Vec<ManifestDependencyDeclaration> {
+fn collect_manifest_declarations(manifest: &toml::Value) -> Vec<ManifestDependencyDeclaration> {
     let mut declarations = Vec::new();
 
     for section in ["dependencies", "dev-dependencies", "build-dependencies"] {

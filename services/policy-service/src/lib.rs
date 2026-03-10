@@ -4,6 +4,8 @@ use contracts::{
     ImpactTier, PolicyDecisionOutcome, PolicyDecisionRequestV1, PolicyDecisionV1, ServiceBoundaryV1,
 };
 use error_model::InstitutionalResult;
+use futures::future::BoxFuture;
+use identity::{DecisionId, EvidenceId};
 use policy_sdk::PolicyDecisionPort;
 
 #[derive(Debug, Clone)]
@@ -33,44 +35,53 @@ impl PolicyService {
 }
 
 impl PolicyDecisionPort for PolicyService {
-    fn evaluate(&self, request: &PolicyDecisionRequestV1) -> InstitutionalResult<PolicyDecisionV1> {
-        let mut denial_reasons = Vec::new();
-        if request.policy_refs.is_empty() {
-            denial_reasons.push("policy_refs must not be empty".to_owned());
-        }
-        if self.freeze_active && request.impact_tier != ImpactTier::Tier0 {
-            denial_reasons.push("change freeze is active".to_owned());
-        }
-        if request
-            .exception_refs
-            .iter()
-            .any(|exception_ref| self.expired_exceptions.contains(exception_ref))
-        {
-            denial_reasons.push("expired exception reference supplied".to_owned());
-        }
-
-        let allowed = denial_reasons.is_empty();
-        let obligations = if allowed {
-            let mut obligations = vec!["record_evidence".to_owned()];
-            if request.impact_tier != ImpactTier::Tier0 {
-                obligations.push("require_human_approval".to_owned());
+    fn evaluate(
+        &self,
+        request: &PolicyDecisionRequestV1,
+    ) -> BoxFuture<'_, InstitutionalResult<PolicyDecisionV1>> {
+        let request = request.clone();
+        Box::pin(async move {
+            let mut denial_reasons = Vec::new();
+            if request.policy_refs.is_empty() {
+                denial_reasons.push("policy_refs must not be empty".to_owned());
             }
-            obligations
-        } else {
-            Vec::new()
-        };
+            if self.freeze_active && request.impact_tier != ImpactTier::Tier0 {
+                denial_reasons.push("change freeze is active".to_owned());
+            }
+            if request
+                .exception_refs
+                .iter()
+                .any(|exception_ref| self.expired_exceptions.contains(exception_ref))
+            {
+                denial_reasons.push("expired exception reference supplied".to_owned());
+            }
 
-        Ok(PolicyDecisionV1 {
-            decision_id: format!("decision::{}", request.request_id),
-            request_id: request.request_id.clone(),
-            decision: if allowed {
-                PolicyDecisionOutcome::Allow
+            let allowed = denial_reasons.is_empty();
+            let obligations = if allowed {
+                let mut obligations = vec!["record_evidence".to_owned()];
+                if request.impact_tier != ImpactTier::Tier0 {
+                    obligations.push("require_human_approval".to_owned());
+                }
+                obligations
             } else {
-                PolicyDecisionOutcome::Deny
-            },
-            obligations,
-            denial_reasons,
-            evidence_refs: vec![format!("evidence::{}", request.request_id)],
+                Vec::new()
+            };
+
+            Ok(PolicyDecisionV1 {
+                decision_id: DecisionId::from(format!("decision::{}", request.request_id)),
+                request_id: request.request_id.clone(),
+                decision: if allowed {
+                    PolicyDecisionOutcome::Allow
+                } else {
+                    PolicyDecisionOutcome::Deny
+                },
+                obligations,
+                denial_reasons,
+                evidence_refs: vec![EvidenceId::from(format!(
+                    "evidence::{}",
+                    request.request_id
+                ))],
+            })
         })
     }
 }
@@ -78,15 +89,15 @@ impl PolicyDecisionPort for PolicyService {
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: "policy-service".to_owned(),
+        service_name: "policy-service".into(),
         domain: "strategy_governance".to_owned(),
         approved_workflows: vec![
-            "knowledge_publication".to_owned(),
-            "policy_exception".to_owned(),
-            "release_approval".to_owned(),
-            "treasury_disbursement".to_owned(),
-            "quant_strategy_promotion".to_owned(),
+            "knowledge_publication".into(),
+            "policy_exception".into(),
+            "release_approval".into(),
+            "treasury_disbursement".into(),
+            "quant_strategy_promotion".into(),
         ],
-        owned_aggregates: vec!["policy_decision".to_owned(), "policy_exception".to_owned()],
+        owned_aggregates: vec!["policy_decision".into(), "policy_exception".into()],
     }
 }

@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use contracts::{AgentActionRequestV1, Classification, ImpactTier};
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
+use identity::WorkflowId;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,7 +18,7 @@ pub struct AgentManifest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentAuthorization {
     pub role: String,
-    pub requested_workflow: String,
+    pub requested_workflow: WorkflowId,
     pub requires_human_approval: bool,
 }
 
@@ -106,35 +107,37 @@ impl AgentRegistry {
         role: &str,
         action: &AgentActionRequestV1,
     ) -> InstitutionalResult<AgentAuthorization> {
-        let manifest = self
-            .manifests
-            .get(role)
-            .ok_or_else(|| InstitutionalError::NotFound {
-                resource: role.to_owned(),
-            })?;
+        let manifest = self.manifests.get(role).ok_or_else(|| {
+            InstitutionalError::not_found(
+                OperationContext::new("agents/runtime", "authorize_action"),
+                role.to_owned(),
+            )
+        })?;
 
         if !manifest
             .allowed_workflows
             .iter()
-            .any(|workflow| workflow == &action.requested_workflow)
+            .any(|workflow| workflow == action.requested_workflow.as_str())
         {
-            return Err(InstitutionalError::PolicyDenied {
-                reason: format!(
+            return Err(InstitutionalError::policy_denied(
+                OperationContext::new("agents/runtime", "authorize_action"),
+                format!(
                     "agent `{role}` is not allowed to request workflow `{}`",
                     action.requested_workflow
                 ),
-            });
+            ));
         }
 
         if classification_rank(action.classification)
             > classification_ceiling_rank(&manifest.classification_ceiling)
         {
-            return Err(InstitutionalError::PolicyDenied {
-                reason: format!(
+            return Err(InstitutionalError::policy_denied(
+                OperationContext::new("agents/runtime", "authorize_action"),
+                format!(
                     "agent `{role}` exceeds classification ceiling `{}`",
                     manifest.classification_ceiling
                 ),
-            });
+            ));
         }
 
         Ok(AgentAuthorization {

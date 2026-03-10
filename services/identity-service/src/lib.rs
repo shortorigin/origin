@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use contracts::ServiceBoundaryV1;
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use identity::{ActorRef, ActorV1, InstitutionalRole};
 
 #[derive(Debug, Default, Clone)]
@@ -19,18 +19,19 @@ impl IdentityService {
         actor_ref: &ActorRef,
         role: InstitutionalRole,
     ) -> InstitutionalResult<()> {
-        let actor = self
-            .actors
-            .get(&actor_ref.0)
-            .ok_or_else(|| InstitutionalError::NotFound {
-                resource: actor_ref.0.clone(),
-            })?;
+        let actor = self.actors.get(&actor_ref.0).ok_or_else(|| {
+            InstitutionalError::not_found(
+                OperationContext::new("services/identity-service", "require_role"),
+                actor_ref.0.clone(),
+            )
+        })?;
         if actor.has_role(role) {
             Ok(())
         } else {
-            Err(InstitutionalError::IdentityViolation {
-                actor: actor_ref.0.clone(),
-            })
+            Err(InstitutionalError::identity_violation(
+                OperationContext::new("services/identity-service", "require_role"),
+                actor_ref.0.clone(),
+            ))
         }
     }
 }

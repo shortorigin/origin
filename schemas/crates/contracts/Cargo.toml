@@ -10,6 +10,7 @@ chrono.workspace = true
 identity = { path = "../../../shared/identity" }
 serde.workspace = true
 serde_json.workspace = true
+telemetry = { path = "../../../shared/telemetry" }
 uuid.workspace = true
 
 [lints]

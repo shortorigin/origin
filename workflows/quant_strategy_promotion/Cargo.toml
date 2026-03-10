@@ -16,6 +16,7 @@ evidence-service = { path = "../../services/evidence-service" }
 evidence-sdk = { path = "../../shared/evidence-sdk" }
 execution-service = { path = "../../services/execution-service" }
 governance-service = { path = "../../services/governance-service" }
+identity = { path = "../../shared/identity" }
 market-data-service = { path = "../../services/market-data-service" }
 orchestrator = { path = "../../platform/runtime/orchestrator" }
 policy-sdk = { path = "../../shared/policy-sdk" }
@@ -31,8 +32,8 @@ trading-sim = { path = "../../shared/trading-sim" }
 
 [dev-dependencies]
 compliance-attestation = { path = "../compliance_attestation" }
-identity = { path = "../../shared/identity" }
 strategy-review = { path = "../strategy_review" }
+tokio.workspace = true
 
 [lints]
 workspace = true

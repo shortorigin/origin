@@ -9,7 +9,7 @@ use contracts::{
     MarketDataBatchV1, PromotionRecommendationV1, QuantStrategyPromotionRequestV1,
     ServiceBoundaryV1, WorkflowBoundaryV1,
 };
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use events::EventEnvelopeV1;
 use lattice_config::LatticeConfigV1;
 use serde::{Deserialize, Serialize};
@@ -89,15 +89,21 @@ impl InstitutionalPlatformTransport for NoopPlatformTransport {
         &self,
         _command: PlatformCommandV1,
     ) -> TransportFuture<PlatformCommandAckV1> {
-        Box::pin(future::ready(Err(InstitutionalError::PolicyDenied {
-            reason: "no platform transport configured".to_string(),
-        })))
+        Box::pin(future::ready(Err(
+            InstitutionalError::dependency_unavailable(
+                OperationContext::new("platform/sdk/sdk-rs", "execute_command"),
+                "no platform transport configured",
+            ),
+        )))
     }
 
     fn execute_query(&self, _query: PlatformQueryV1) -> TransportFuture<PlatformQueryResultV1> {
-        Box::pin(future::ready(Err(InstitutionalError::PolicyDenied {
-            reason: "no platform transport configured".to_string(),
-        })))
+        Box::pin(future::ready(Err(
+            InstitutionalError::dependency_unavailable(
+                OperationContext::new("platform/sdk/sdk-rs", "execute_query"),
+                "no platform transport configured",
+            ),
+        )))
     }
 
     fn subscribe_events(&self) -> EventSubscription {
@@ -227,9 +233,10 @@ where
             .await?
         {
             PlatformQueryResultV1::Dashboard(snapshot) => Ok(snapshot),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "dashboard query returned non-dashboard payload".to_string(),
-            }),
+            _ => Err(InstitutionalError::invariant(
+                OperationContext::new("platform/sdk/sdk-rs", "query_dashboard"),
+                "dashboard query returned non-dashboard payload",
+            )),
         }
     }
 
@@ -240,9 +247,10 @@ where
             .await?
         {
             PlatformQueryResultV1::SupportedWorkflows(workflows) => Ok(workflows),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "workflow query returned non-workflow payload".to_string(),
-            }),
+            _ => Err(InstitutionalError::invariant(
+                OperationContext::new("platform/sdk/sdk-rs", "query_supported_workflows"),
+                "workflow query returned non-workflow payload",
+            )),
         }
     }
 
@@ -258,9 +266,10 @@ where
             .await?
         {
             PlatformQueryResultV1::MacroFinancialAnalysis(analysis) => Ok(*analysis),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "macro analysis query returned non-analysis payload".to_string(),
-            }),
+            _ => Err(InstitutionalError::invariant(
+                OperationContext::new("platform/sdk/sdk-rs", "query_macro_financial_analysis"),
+                "macro analysis query returned non-analysis payload",
+            )),
         }
     }
 
@@ -273,9 +282,13 @@ where
             .await?
         {
             PlatformQueryResultV1::KnowledgePublicationStatus(status) => Ok(status),
-            _ => Err(InstitutionalError::InvariantViolation {
-                invariant: "knowledge status query returned non-status payload".to_string(),
-            }),
+            _ => Err(InstitutionalError::invariant(
+                OperationContext::new(
+                    "platform/sdk/sdk-rs",
+                    "query_latest_knowledge_publication_status",
+                ),
+                "knowledge status query returned non-status payload",
+            )),
         }
     }
 
@@ -286,14 +299,14 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct MemoryPlatformTransport {
+pub struct LocalHarnessPlatformTransport {
     dashboard: UiDashboardSnapshotV1,
     recent_events: Vec<EventEnvelopeV1>,
     analyses: BTreeMap<String, MacroFinancialAnalysisV1>,
     latest_publication_status: Option<KnowledgePublicationStatusV1>,
 }
 
-impl MemoryPlatformTransport {
+impl LocalHarnessPlatformTransport {
     #[must_use]
     pub fn new(dashboard: UiDashboardSnapshotV1, recent_events: Vec<EventEnvelopeV1>) -> Self {
         Self {
@@ -317,7 +330,7 @@ impl MemoryPlatformTransport {
     }
 }
 
-impl InstitutionalPlatformTransport for MemoryPlatformTransport {
+impl InstitutionalPlatformTransport for LocalHarnessPlatformTransport {
     fn execute_command(
         &self,
         _command: PlatformCommandV1,
@@ -606,7 +619,7 @@ mod tests {
             rendered_output: "rendered".to_string(),
             retrieval_context: vec!["context".to_string()],
         };
-        let transport = MemoryPlatformTransport::new(dashboard.clone(), vec![event.clone()])
+        let transport = LocalHarnessPlatformTransport::new(dashboard.clone(), vec![event.clone()])
             .with_analysis(analysis.clone())
             .with_latest_publication_status(KnowledgePublicationStatusV1 {
                 publication_id: "publication-1".to_string(),
