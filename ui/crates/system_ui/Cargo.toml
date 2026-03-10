@@ -1,7 +1,9 @@
 [package]
 name = "system_ui"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+version.workspace = true
 build = "build.rs"
 
 [features]
@@ -10,10 +12,10 @@ csr = ["leptos/csr"]
 
 [dependencies]
 leptos = { version = "0.6", default-features = false }
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
 
 [build-dependencies]
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
 toml = "0.8"
 
 [dev-dependencies]

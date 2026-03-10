@@ -7,6 +7,18 @@ use crate::common::workspace_root;
 use regex::Regex;
 use serde::Deserialize;
 
+const FOUNDATIONAL_WORKSPACE_DEPENDENCIES: &[&str] = &[
+    "futures",
+    "quick-xml",
+    "reqwest",
+    "serde",
+    "serde_json",
+    "tempfile",
+    "thiserror",
+    "tokio",
+    "tracing",
+];
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Plane {
     Enterprise,
@@ -54,15 +66,34 @@ impl Plane {
 struct ManifestDependency {
     section: String,
     name: String,
-    target_path: String,
-    plane: Plane,
+    requested_path: String,
+    target_path: Option<String>,
+    plane: Option<Plane>,
+    within_workspace: bool,
+    resolution_error: Option<String>,
 }
 
 #[derive(Debug)]
 struct MemberAudit {
     member_path: String,
     plane: Plane,
+    dependency_declarations: Vec<ManifestDependencyDeclaration>,
     dependencies: Vec<ManifestDependency>,
+    documented_workspace_exceptions: BTreeMap<String, String>,
+}
+
+#[derive(Debug)]
+struct ManifestDependencyDeclaration {
+    section: String,
+    name: String,
+    uses_workspace_inheritance: bool,
+    explicit_version: Option<String>,
+}
+
+#[derive(Debug)]
+struct RootWorkspaceManifest {
+    members: BTreeSet<String>,
+    workspace_dependencies: BTreeSet<String>,
 }
 
 #[derive(Debug)]
@@ -133,9 +164,10 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
 
 fn audit_boundaries() -> Result<(), String> {
     let workspace_root = workspace_root()?;
+    let root_manifest = read_root_workspace_manifest(&workspace_root)?;
     let audits = audit_workspace_members(&workspace_root)?;
     let metadata = load_workspace_metadata(&workspace_root)?;
-    let defects = collect_boundary_defects(&workspace_root, &audits, &metadata)?;
+    let defects = collect_boundary_defects(&workspace_root, &root_manifest, &audits, &metadata)?;
 
     if defects.is_empty() {
         println!("architecture boundary audit passed");
@@ -150,22 +182,44 @@ fn audit_boundaries() -> Result<(), String> {
 }
 
 fn audit_workspace_members(workspace_root: &Path) -> Result<Vec<MemberAudit>, String> {
+    let root_manifest = read_root_workspace_manifest(workspace_root)?;
+
+    root_manifest
+        .members
+        .iter()
+        .map(String::as_str)
+        .map(|member| audit_member(workspace_root, member))
+        .collect()
+}
+
+fn read_root_workspace_manifest(workspace_root: &Path) -> Result<RootWorkspaceManifest, String> {
     let root_manifest = fs::read_to_string(workspace_root.join("Cargo.toml"))
         .map_err(|error| format!("failed to read workspace Cargo.toml: {error}"))?;
     let root_value: toml::Value = toml::from_str(&root_manifest)
         .map_err(|error| format!("failed to parse workspace Cargo.toml: {error}"))?;
-    let members = root_value
+    let workspace = root_value
         .get("workspace")
         .and_then(toml::Value::as_table)
-        .and_then(|workspace| workspace.get("members"))
-        .and_then(toml::Value::as_array)
-        .ok_or_else(|| "workspace members are missing from root Cargo.toml".to_string())?;
+        .ok_or_else(|| "workspace table is missing from root Cargo.toml".to_string())?;
 
-    members
+    let members = workspace
+        .get("members")
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| "workspace members are missing from root Cargo.toml".to_string())?
         .iter()
         .filter_map(toml::Value::as_str)
-        .map(|member| audit_member(workspace_root, member))
-        .collect()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    let workspace_dependencies = workspace
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .map(|dependencies| dependencies.keys().cloned().collect())
+        .unwrap_or_default();
+
+    Ok(RootWorkspaceManifest {
+        members,
+        workspace_dependencies,
+    })
 }
 
 fn audit_member(workspace_root: &Path, member: &str) -> Result<MemberAudit, String> {
@@ -181,8 +235,95 @@ fn audit_member(workspace_root: &Path, member: &str) -> Result<MemberAudit, Stri
     Ok(MemberAudit {
         member_path: member.to_string(),
         plane: classify_member_path(member),
+        dependency_declarations: collect_manifest_declarations(&manifest),
         dependencies: collect_manifest_dependencies(workspace_root, manifest_dir, &manifest)?,
+        documented_workspace_exceptions: collect_documented_workspace_exceptions(&manifest),
     })
+}
+
+fn collect_manifest_declarations(
+    manifest: &toml::Value,
+) -> Vec<ManifestDependencyDeclaration> {
+    let mut declarations = Vec::new();
+
+    for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        if let Some(table) = manifest.get(section).and_then(toml::Value::as_table) {
+            declarations.extend(parse_dependency_declaration_table(section, table));
+        }
+    }
+
+    if let Some(targets) = manifest.get("target").and_then(toml::Value::as_table) {
+        for (target_name, value) in targets {
+            if let Some(target_table) = value.as_table() {
+                for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+                    if let Some(table) = target_table.get(section).and_then(toml::Value::as_table) {
+                        let scoped = format!("target.{target_name}.{section}");
+                        declarations.extend(parse_dependency_declaration_table(&scoped, table));
+                    }
+                }
+            }
+        }
+    }
+
+    declarations
+}
+
+fn parse_dependency_declaration_table(
+    section: &str,
+    table: &toml::Table,
+) -> Vec<ManifestDependencyDeclaration> {
+    let mut declarations = Vec::new();
+
+    for (name, value) in table {
+        let (uses_workspace_inheritance, explicit_version) = match value {
+            toml::Value::Table(inner) => (
+                inner
+                    .get("workspace")
+                    .and_then(toml::Value::as_bool)
+                    .unwrap_or(false),
+                inner
+                    .get("version")
+                    .and_then(toml::Value::as_str)
+                    .map(str::to_owned),
+            ),
+            toml::Value::String(version) => (false, Some(version.clone())),
+            _ => (false, None),
+        };
+
+        declarations.push(ManifestDependencyDeclaration {
+            section: section.to_string(),
+            name: name.clone(),
+            uses_workspace_inheritance,
+            explicit_version,
+        });
+    }
+
+    declarations
+}
+
+fn collect_documented_workspace_exceptions(manifest: &toml::Value) -> BTreeMap<String, String> {
+    manifest
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .and_then(|package| package.get("metadata"))
+        .and_then(toml::Value::as_table)
+        .and_then(|metadata| metadata.get("origin"))
+        .and_then(toml::Value::as_table)
+        .and_then(|origin| origin.get("workspace-dependency-exceptions"))
+        .and_then(toml::Value::as_table)
+        .map(|exceptions| {
+            exceptions
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .as_str()
+                        .map(str::trim)
+                        .filter(|reason| !reason.is_empty())
+                        .map(|reason| (name.clone(), reason.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn collect_manifest_dependencies(
@@ -239,27 +380,50 @@ fn parse_dependency_table(
             continue;
         };
         let candidate = manifest_dir.join(path_value);
-        let resolved = fs::canonicalize(&candidate).map_err(|error| {
-            format!(
-                "failed to resolve dependency path `{}` from `{}`: {error}",
-                candidate.display(),
-                manifest_dir.display()
-            )
-        })?;
-        if !resolved.starts_with(&canonical_workspace_root) {
-            continue;
+        match fs::canonicalize(&candidate) {
+            Ok(resolved) if resolved.starts_with(&canonical_workspace_root) => {
+                let relative = resolved
+                    .strip_prefix(&canonical_workspace_root)
+                    .map_err(|error| format!("failed to strip workspace prefix: {error}"))?
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                dependencies.push(ManifestDependency {
+                    section: section.to_string(),
+                    name: name.clone(),
+                    requested_path: path_value.to_string(),
+                    target_path: Some(relative.clone()),
+                    plane: Some(classify_member_path(&relative)),
+                    within_workspace: true,
+                    resolution_error: None,
+                });
+            }
+            Ok(_) => {
+                dependencies.push(ManifestDependency {
+                    section: section.to_string(),
+                    name: name.clone(),
+                    requested_path: path_value.to_string(),
+                    target_path: None,
+                    plane: None,
+                    within_workspace: false,
+                    resolution_error: None,
+                });
+            }
+            Err(error) => {
+                dependencies.push(ManifestDependency {
+                    section: section.to_string(),
+                    name: name.clone(),
+                    requested_path: path_value.to_string(),
+                    target_path: None,
+                    plane: None,
+                    within_workspace: true,
+                    resolution_error: Some(format!(
+                        "failed to resolve dependency path `{}` from `{}`: {error}",
+                        candidate.display(),
+                        manifest_dir.display()
+                    )),
+                });
+            }
         }
-        let relative = resolved
-            .strip_prefix(&canonical_workspace_root)
-            .map_err(|error| format!("failed to strip workspace prefix: {error}"))?
-            .to_string_lossy()
-            .replace('\\', "/");
-        dependencies.push(ManifestDependency {
-            section: section.to_string(),
-            name: name.clone(),
-            plane: classify_member_path(&relative),
-            target_path: relative,
-        });
     }
 
     Ok(dependencies)
@@ -274,28 +438,35 @@ fn dependency_path(value: &toml::Value) -> Option<&str> {
 
 fn collect_boundary_defects(
     workspace_root: &Path,
+    root_manifest: &RootWorkspaceManifest,
     audits: &[MemberAudit],
     metadata: &MetadataWorkspace,
 ) -> Result<Vec<String>, String> {
-    let mut defects = Vec::new();
+    let mut defects = scan_for_manifest_governance_defects(root_manifest, audits);
 
     for audit in audits {
         let allowed = allowed_planes(audit.plane);
         for dependency in &audit.dependencies {
-            if !allowed.contains(&dependency.plane) {
-                defects.push(format!(
-                    "member `{}` in plane `{}` has disallowed {} dependency `{}` -> `{}` ({})",
-                    audit.member_path,
-                    audit.plane.as_str(),
-                    dependency.section,
-                    dependency.name,
-                    dependency.target_path,
-                    dependency.plane.as_str()
-                ));
+            if let (Some(target_path), Some(plane)) = (&dependency.target_path, dependency.plane) {
+                if !allowed.contains(&plane) {
+                    defects.push(format!(
+                        "member `{}` in plane `{}` has disallowed {} dependency `{}` -> `{}` ({})",
+                        audit.member_path,
+                        audit.plane.as_str(),
+                        dependency.section,
+                        dependency.name,
+                        target_path,
+                        plane.as_str()
+                    ));
+                }
             }
         }
     }
 
+    defects.extend(scan_for_invalid_workspace_path_dependencies(
+        root_manifest,
+        audits,
+    ));
     defects.extend(scan_for_direct_surreal_usage(workspace_root)?);
     defects.extend(scan_for_transitive_workspace_violations(metadata));
     defects.extend(scan_for_workspace_import_violations(
@@ -303,6 +474,85 @@ fn collect_boundary_defects(
         metadata,
     )?);
     Ok(defects)
+}
+
+fn scan_for_manifest_governance_defects(
+    root_manifest: &RootWorkspaceManifest,
+    audits: &[MemberAudit],
+) -> Vec<String> {
+    let foundational = FOUNDATIONAL_WORKSPACE_DEPENDENCIES
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut defects = Vec::new();
+
+    for audit in audits {
+        for declaration in &audit.dependency_declarations {
+            if declaration.uses_workspace_inheritance
+                && !root_manifest
+                    .workspace_dependencies
+                    .contains(&declaration.name)
+            {
+                defects.push(format!(
+                    "member `{}` uses workspace dependency `{}` in `{}` but root `[workspace.dependencies]` does not define it",
+                    audit.member_path, declaration.name, declaration.section
+                ));
+            }
+            if foundational.contains(declaration.name.as_str())
+                && declaration.explicit_version.is_some()
+                && !audit
+                    .documented_workspace_exceptions
+                    .contains_key(&declaration.name)
+            {
+                defects.push(format!(
+                    "member `{}` pins foundational dependency `{}` in `{}` instead of workspace inheritance",
+                    audit.member_path, declaration.name, declaration.section
+                ));
+            }
+        }
+    }
+
+    defects
+}
+
+fn scan_for_invalid_workspace_path_dependencies(
+    root_manifest: &RootWorkspaceManifest,
+    audits: &[MemberAudit],
+) -> Vec<String> {
+    let mut defects = Vec::new();
+
+    for audit in audits {
+        for dependency in &audit.dependencies {
+            if let Some(error) = &dependency.resolution_error {
+                defects.push(format!(
+                    "member `{}` has unresolved {} path dependency `{}` -> `{}`: {error}",
+                    audit.member_path,
+                    dependency.section,
+                    dependency.name,
+                    dependency.requested_path
+                ));
+                continue;
+            }
+            if !dependency.within_workspace {
+                continue;
+            }
+            let Some(target_path) = &dependency.target_path else {
+                continue;
+            };
+            let member_path = target_path
+                .strip_suffix("/Cargo.toml")
+                .unwrap_or(target_path);
+            if root_manifest.members.contains(member_path) {
+                continue;
+            }
+            defects.push(format!(
+                "member `{}` has {} path dependency `{}` -> `{}` that is not listed in workspace members",
+                audit.member_path, dependency.section, dependency.name, member_path
+            ));
+        }
+    }
+
+    defects
 }
 
 fn load_workspace_metadata(workspace_root: &Path) -> Result<MetadataWorkspace, String> {
@@ -788,8 +1038,10 @@ fn help() -> String {
 mod tests {
     use super::{
         audit_workspace_members, build_metadata_workspace, classify_member_path,
-        classify_repo_path, planes_for_paths, scan_for_transitive_workspace_violations,
-        scan_for_workspace_import_violations, CargoMetadata, Plane,
+        classify_repo_path, planes_for_paths, read_root_workspace_manifest,
+        scan_for_invalid_workspace_path_dependencies, scan_for_manifest_governance_defects,
+        scan_for_transitive_workspace_violations, scan_for_workspace_import_violations,
+        CargoMetadata, Plane,
     };
     use std::collections::BTreeSet;
     use std::fs;
@@ -920,7 +1172,7 @@ edition = "2021"
             .find(|audit| audit.member_path == "ui/app")
             .expect("ui audit");
         assert_eq!(ui_audit.dependencies.len(), 1);
-        assert_eq!(ui_audit.dependencies[0].plane, Plane::Platform);
+        assert_eq!(ui_audit.dependencies[0].plane, Some(Plane::Platform));
     }
 
     #[test]
@@ -960,7 +1212,164 @@ edition = "2021"
             .iter()
             .find(|audit| audit.member_path == "ui/app")
             .expect("ui audit");
-        assert_eq!(ui_audit.dependencies[0].plane, Plane::Services);
+        assert_eq!(ui_audit.dependencies[0].plane, Some(Plane::Services));
+    }
+
+    #[test]
+    fn manifest_governance_detects_missing_workspace_dependency_definition() {
+        let root = unique_temp_dir("missing-workspace-dep");
+        write_file(
+            &root.join("Cargo.toml"),
+            r#"
+[workspace]
+members = ["ui/app"]
+
+[workspace.dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+"#,
+        );
+        write_file(
+            &root.join("ui/app/Cargo.toml"),
+            r#"
+[package]
+name = "ui-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio.workspace = true
+"#,
+        );
+
+        let root_manifest = read_root_workspace_manifest(&root).expect("root manifest");
+        let audits = audit_workspace_members(&root).expect("audit workspace");
+        let defects = scan_for_manifest_governance_defects(&root_manifest, &audits);
+        assert!(
+            defects
+                .iter()
+                .any(|defect| defect.contains("root `[workspace.dependencies]` does not define")),
+            "expected missing workspace dependency defect, got {defects:?}"
+        );
+    }
+
+    #[test]
+    fn manifest_governance_detects_non_member_path_dependency() {
+        let root = unique_temp_dir("non-member-path");
+        write_file(
+            &root.join("Cargo.toml"),
+            r#"
+[workspace]
+members = ["ui/app"]
+"#,
+        );
+        write_file(
+            &root.join("ui/app/Cargo.toml"),
+            r#"
+[package]
+name = "ui-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+helper = { path = "../../shared/helper" }
+"#,
+        );
+        write_file(
+            &root.join("shared/helper/Cargo.toml"),
+            r#"
+[package]
+name = "helper"
+version = "0.1.0"
+edition = "2021"
+"#,
+        );
+
+        let root_manifest = read_root_workspace_manifest(&root).expect("root manifest");
+        let audits = audit_workspace_members(&root).expect("audit workspace");
+        let defects = scan_for_invalid_workspace_path_dependencies(&root_manifest, &audits);
+        assert!(
+            defects
+                .iter()
+                .any(|defect| defect.contains("not listed in workspace members")),
+            "expected non-member path dependency defect, got {defects:?}"
+        );
+    }
+
+    #[test]
+    fn manifest_governance_detects_undocumented_foundational_pin() {
+        let root = unique_temp_dir("foundational-pin");
+        write_file(
+            &root.join("Cargo.toml"),
+            r#"
+[workspace]
+members = ["ui/app"]
+
+[workspace.dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+"#,
+        );
+        write_file(
+            &root.join("ui/app/Cargo.toml"),
+            r#"
+[package]
+name = "ui-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+"#,
+        );
+
+        let root_manifest = read_root_workspace_manifest(&root).expect("root manifest");
+        let audits = audit_workspace_members(&root).expect("audit workspace");
+        let defects = scan_for_manifest_governance_defects(&root_manifest, &audits);
+        assert!(
+            defects
+                .iter()
+                .any(|defect| defect.contains("pins foundational dependency `serde`")),
+            "expected foundational pin defect, got {defects:?}"
+        );
+    }
+
+    #[test]
+    fn manifest_governance_allows_documented_foundational_exception() {
+        let root = unique_temp_dir("documented-exception");
+        write_file(
+            &root.join("Cargo.toml"),
+            r#"
+[workspace]
+members = ["ui/app"]
+
+[workspace.dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+"#,
+        );
+        write_file(
+            &root.join("ui/app/Cargo.toml"),
+            r#"
+[package]
+name = "ui-app"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata.origin.workspace-dependency-exceptions]
+serde = "Pinned intentionally for a temporary compatibility window."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+"#,
+        );
+
+        let root_manifest = read_root_workspace_manifest(&root).expect("root manifest");
+        let audits = audit_workspace_members(&root).expect("audit workspace");
+        let defects = scan_for_manifest_governance_defects(&root_manifest, &audits);
+        assert!(
+            defects
+                .iter()
+                .all(|defect| !defect.contains("pins foundational dependency `serde`")),
+            "expected documented exception to suppress foundational pin defect, got {defects:?}"
+        );
     }
 
     #[test]
