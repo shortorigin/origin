@@ -1,0 +1,198 @@
+{
+  "availability": {
+    "catalog_id": "catalog-us-west",
+    "region_id": "us-west",
+    "bounds": {
+      "north": 49.0,
+      "south": 31.0,
+      "east": -109.0,
+      "west": -125.0
+    },
+    "generated_at": "2026-03-10T11:10:00Z",
+    "source_kinds": ["hrrr", "goes", "nexrad", "surface", "nws_alert"],
+    "available_layers": [
+      {
+        "layer": "precipitation",
+        "latest_event_time": "2026-03-10T11:00:00Z",
+        "latest_valid_time": "2026-03-10T15:00:00Z",
+        "horizon_hours": 4,
+        "product_ref": "product-hrrr-001"
+      },
+      {
+        "layer": "cloud_cover",
+        "latest_event_time": "2026-03-10T11:06:00Z",
+        "latest_valid_time": "2026-03-10T11:10:00Z",
+        "horizon_hours": 0,
+        "product_ref": "product-goes-001"
+      },
+      {
+        "layer": "radar_reflectivity",
+        "latest_event_time": "2026-03-10T11:07:00Z",
+        "latest_valid_time": "2026-03-10T11:12:00Z",
+        "horizon_hours": 0,
+        "product_ref": "product-nexrad-001"
+      }
+    ]
+  },
+  "view": {
+    "view_id": "weather-view-us-west",
+    "region_id": "us-west",
+    "bounds": {
+      "north": 49.0,
+      "south": 31.0,
+      "east": -109.0,
+      "west": -125.0
+    },
+    "generated_at": "2026-03-10T11:10:00Z",
+    "valid_time": "2026-03-10T15:00:00Z",
+    "horizon_hours": 4,
+    "layers": [
+      {
+        "layer": "precipitation",
+        "title": "Pacific Precipitation",
+        "asset_ref": "zarr://weather/views/us-west/precipitation",
+        "native_identifier": "APCP",
+        "event_time": "2026-03-10T11:00:00Z",
+        "valid_time": "2026-03-10T15:00:00Z",
+        "qc_flags": ["passed"],
+        "provenance": [
+          {
+            "source_kind": "hrrr",
+            "source_dataset": "hrrr",
+            "source_object_ref": "s3://noaa-hrrr/hrrr.t15z.wrfsfcf04.grib2",
+            "retrieved_at": "2026-03-10T11:00:00Z",
+            "raw_artifact_hash": "sha-hrrr-001",
+            "transform_version": "weather/v1",
+            "config_hash": "cfg-west-1"
+          }
+        ]
+      },
+      {
+        "layer": "alert_overlay",
+        "title": "NWS Alerts",
+        "asset_ref": "parquet://weather/views/us-west/alerts",
+        "native_identifier": "nws-alerts",
+        "event_time": "2026-03-10T11:09:00Z",
+        "valid_time": "2026-03-10T15:00:00Z",
+        "qc_flags": ["passed"],
+        "provenance": [
+          {
+            "source_kind": "nws_alert",
+            "source_dataset": "nws-alerts",
+            "source_object_ref": "https://api.weather.gov/alerts/active?area=CA",
+            "retrieved_at": "2026-03-10T11:09:00Z",
+            "raw_artifact_hash": "sha-alert-001",
+            "transform_version": "weather/v1",
+            "config_hash": "cfg-west-1"
+          }
+        ]
+      }
+    ],
+    "alert_feed_id": "alerts-us-west"
+  },
+  "feature_slices": [
+    {
+      "slice_id": "feature-us-west-1",
+      "region_id": "us-west",
+      "event_time": "2026-03-10T11:00:00Z",
+      "valid_time": "2026-03-10T15:00:00Z",
+      "lead_hours": 4,
+      "source_product_refs": ["product-hrrr-001"],
+      "features": [
+        {
+          "feature": "precipitation_rate",
+          "value": 2.4,
+          "units": "mm/hr",
+          "probability": 0.62,
+          "qc_flags": ["passed"]
+        },
+        {
+          "feature": "convective_risk",
+          "value": 0.4,
+          "units": "score",
+          "probability": 0.41,
+          "qc_flags": ["estimated"]
+        }
+      ],
+      "provenance": [
+        {
+          "source_kind": "hrrr",
+          "source_dataset": "hrrr",
+          "source_object_ref": "s3://noaa-hrrr/hrrr.t15z.wrfsfcf04.grib2",
+          "retrieved_at": "2026-03-10T11:00:00Z",
+          "raw_artifact_hash": "sha-hrrr-001",
+          "transform_version": "weather/v1",
+          "config_hash": "cfg-west-1"
+        }
+      ]
+    },
+    {
+      "slice_id": "feature-us-west-2",
+      "region_id": "us-west",
+      "event_time": "2026-03-10T11:08:00Z",
+      "valid_time": "2026-03-10T11:08:00Z",
+      "lead_hours": 0,
+      "source_product_refs": ["product-surface-001"],
+      "features": [
+        {
+          "feature": "visibility",
+          "value": 8.0,
+          "units": "mi",
+          "probability": null,
+          "qc_flags": ["passed"]
+        },
+        {
+          "feature": "wind_speed10m",
+          "value": 14.0,
+          "units": "kt",
+          "probability": null,
+          "qc_flags": ["passed"]
+        }
+      ],
+      "provenance": [
+        {
+          "source_kind": "surface",
+          "source_dataset": "metar",
+          "source_object_ref": "https://aviationweather.gov/metar/data?ids=KSFO",
+          "retrieved_at": "2026-03-10T11:08:00Z",
+          "raw_artifact_hash": "sha-surface-001",
+          "transform_version": "weather/v1",
+          "config_hash": "cfg-west-1"
+        }
+      ]
+    }
+  ],
+  "alerts": {
+    "feed_id": "alerts-us-west",
+    "region_id": "us-west",
+    "generated_at": "2026-03-10T11:10:00Z",
+    "alerts": [
+      {
+        "alert_id": "alert-west-1",
+        "region_id": "us-west",
+        "headline": "Flood Watch",
+        "severity": "moderate",
+        "effective_at": "2026-03-10T11:09:00Z",
+        "expires_at": "2026-03-10T18:00:00Z",
+        "source": "nws",
+        "bounds": {
+          "north": 42.0,
+          "south": 36.0,
+          "east": -118.0,
+          "west": -124.0
+        },
+        "provenance": [
+          {
+            "source_kind": "nws_alert",
+            "source_dataset": "nws-alerts",
+            "source_object_ref": "https://api.weather.gov/alerts/active?area=CA",
+            "retrieved_at": "2026-03-10T11:09:00Z",
+            "raw_artifact_hash": "sha-alert-001",
+            "transform_version": "weather/v1",
+            "config_hash": "cfg-west-1"
+          }
+        ]
+      }
+    ]
+  }
+}
