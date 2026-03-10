@@ -16,6 +16,8 @@ policy-sdk = { path = "../../../shared/policy-sdk" }
 serde.workspace = true
 sha2.workspace = true
 telemetry = { path = "../../../shared/telemetry" }
+tokio.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true

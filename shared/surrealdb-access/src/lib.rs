@@ -15,6 +15,11 @@ use surrealdb_model::{
 pub const DEFAULT_NAMESPACE: &str = "short_origin";
 pub const DEFAULT_DATABASE: &str = "institutional";
 
+pub use surrealdb::Connection as BackendConnection;
+
+pub type KnowledgeStoreBackend<C> = SurrealRepositoryContext<C>;
+pub type InMemoryKnowledgeStoreBackend = SurrealRepositoryContext<Db>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableCatalog {
     pub workflow_execution: &'static str,
@@ -519,13 +524,13 @@ mod tests {
             .store(
                 "evidence-1",
                 EvidenceManifestV1 {
-                    evidence_id: "evidence-1".to_string(),
+                    evidence_id: "evidence-1".into(),
                     producer: "tests".to_string(),
                     artifact_hash: "abc".to_string(),
                     storage_ref: "surrealdb:evidence/evidence-1".to_string(),
                     retention_class: "standard".to_string(),
                     classification: Classification::Internal,
-                    related_decision_refs: vec!["decision-1".to_string()],
+                    related_decision_refs: vec!["decision-1".into()],
                 },
             )
             .await

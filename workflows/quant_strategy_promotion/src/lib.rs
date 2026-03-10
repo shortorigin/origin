@@ -11,10 +11,11 @@ use contracts::{
     PromotionRecommendationV1, QuantStrategyPromotionRequestV1, ResearchTaskV1, SignalSideV1,
     SignalV1, SimulationConfigV1, SymbolV1, TimeInForceV1, VenueV1, WorkflowBoundaryV1,
 };
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use evidence_service::EvidenceService;
 use execution_service::{EventDrivenStrategyEngine, ExecutionRouter};
 use governance_service::GovernanceService;
+use identity::{AggregateId, EnvironmentId, ServiceId, WorkflowId};
 use market_data_service::{CoinbaseAdapter, MarketDataService, OandaAdapter};
 use orchestrator::WorkflowEngine;
 use policy_sdk::{ApprovalVerificationPort, PolicyDecisionPort};
@@ -83,7 +84,7 @@ pub fn workflow_boundary() -> WorkflowBoundaryV1 {
     }
 }
 
-pub fn execute<P, A, E>(
+pub async fn execute<P, A, E>(
     engine: &mut WorkflowEngine<P, A, E>,
     governance_service: &mut GovernanceService,
     compliance_service: &mut ComplianceService,
@@ -186,9 +187,10 @@ where
     )?;
     let ranked = research_service.ranked();
     let Some(top) = ranked.first() else {
-        return Err(InstitutionalError::InvariantViolation {
-            invariant: "quant strategy promotion requires ranked experiments".to_string(),
-        });
+        return Err(InstitutionalError::invariant(
+            OperationContext::new("workflows/quant_strategy_promotion", "execute"),
+            "quant strategy promotion requires ranked experiments",
+        ));
     };
     let ai_summary = ai_assisted_summary(&ranked);
 
@@ -400,21 +402,23 @@ where
 
     let guarded_request = enforcement::GuardedMutationRequest {
         action_id: action.action_id.clone(),
-        workflow_name: "quant_strategy_promotion".to_owned(),
-        target_service: "governance-service".to_owned(),
-        target_aggregate: "promotion_recommendation".to_owned(),
+        workflow_name: WorkflowId::from("quant_strategy_promotion"),
+        target_service: ServiceId::from("governance-service"),
+        target_aggregate: AggregateId::from("promotion_recommendation"),
         actor_ref: action.actor_ref.clone(),
         impact_tier: action.impact_tier,
         classification: action.classification,
         policy_refs: action.policy_refs.clone(),
         required_approver_roles: action.required_approver_roles.clone(),
-        environment: "prod".to_owned(),
+        environment: EnvironmentId::from("prod"),
         cross_domain: true,
     };
 
-    let recommendation = engine.execute_mutation(guarded_request, |context| {
-        governance_service.record_recommendation(context, recommendation.clone())
-    })?;
+    let recommendation = engine
+        .execute_mutation(guarded_request, |context| {
+            governance_service.record_recommendation(context, recommendation.clone())
+        })
+        .await?;
 
     Ok(QuantStrategyPromotionReport {
         summary,
@@ -507,7 +511,8 @@ fn run_paper_sessions(
 }
 
 fn invariant_error(error: impl ToString) -> InstitutionalError {
-    InstitutionalError::InvariantViolation {
-        invariant: error.to_string(),
-    }
+    InstitutionalError::invariant(
+        OperationContext::new("workflows/quant_strategy_promotion", "invariant_error"),
+        error.to_string(),
+    )
 }

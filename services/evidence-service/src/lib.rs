@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use contracts::{EvidenceManifestV1, ServiceBoundaryV1};
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext, SourceErrorInfo};
 use evidence_sdk::{EvidenceSink, MemoryEvidenceSink};
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use trading_core::{hash_payload, Clock, IdGenerator, SystemClock, SystemIdGenerator};
 use trading_errors::TradingError;
@@ -19,10 +20,14 @@ const APPROVED_WORKFLOWS: &[&str] = &[
 const OWNED_AGGREGATES: &[&str] = &["evidence_manifest", "audit_event"];
 
 fn map_trading_error(error: TradingError) -> InstitutionalError {
-    InstitutionalError::external(
-        "trading-core",
-        Some("evidence-chain".to_string()),
-        error.to_string(),
+    InstitutionalError::persistence(
+        OperationContext::new("services/evidence-service", "append_audit_event"),
+        "failed to hash audit payload",
+        SourceErrorInfo::new(
+            "trading-core",
+            Some("hash_payload".to_string()),
+            error.to_string(),
+        ),
     )
 }
 
@@ -66,7 +71,7 @@ impl std::fmt::Debug for EvidenceService {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("EvidenceService")
-            .field("manifests", &self.sink.recorded().len())
+            .field("manifests", &self.sink.len().unwrap_or_default())
             .field("audit_events", &self.audit_log.events().len())
             .finish_non_exhaustive()
     }
@@ -122,11 +127,11 @@ impl EvidenceService {
 }
 
 impl EvidenceSink for EvidenceService {
-    fn record(&mut self, manifest: EvidenceManifestV1) -> InstitutionalResult<()> {
+    fn record(&self, manifest: EvidenceManifestV1) -> BoxFuture<'_, InstitutionalResult<()>> {
         self.sink.record(manifest)
     }
 
-    fn recorded(&self) -> Vec<EvidenceManifestV1> {
+    fn recorded(&self) -> BoxFuture<'_, InstitutionalResult<Vec<EvidenceManifestV1>>> {
         self.sink.recorded()
     }
 }
@@ -134,15 +139,9 @@ impl EvidenceSink for EvidenceService {
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: SERVICE_NAME.to_owned(),
+        service_name: SERVICE_NAME.into(),
         domain: DOMAIN_NAME.to_owned(),
-        approved_workflows: APPROVED_WORKFLOWS
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-        owned_aggregates: OWNED_AGGREGATES
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        approved_workflows: APPROVED_WORKFLOWS.iter().copied().map(Into::into).collect(),
+        owned_aggregates: OWNED_AGGREGATES.iter().copied().map(Into::into).collect(),
     }
 }

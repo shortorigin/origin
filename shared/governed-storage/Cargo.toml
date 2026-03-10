@@ -1,5 +1,5 @@
 [package]
-name = "policy-service"
+name = "governed-storage"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
@@ -7,10 +7,10 @@ version.workspace = true
 
 [dependencies]
 contracts = { path = "../../schemas/crates/contracts" }
-error-model = { path = "../../shared/error-model" }
+error-model = { path = "../error-model" }
+events = { path = "../../schemas/crates/events" }
 futures.workspace = true
-identity = { path = "../../shared/identity" }
-policy-sdk = { path = "../../shared/policy-sdk" }
+storage_backend = { package = "surrealdb-access", path = "../surrealdb-access" }
 
 [lints]
 workspace = true

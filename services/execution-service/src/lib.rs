@@ -4,7 +4,7 @@ use std::sync::Arc;
 use contracts::{
     LimitBreachRecordV1, MarketEventV1, OrderRequestV1, OrderStatusV1, ServiceBoundaryV1, VenueV1,
 };
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use events::{
     CapitalMarketsEventPayloadV1, FillRecordedV1, OrderSubmittedV1, PortfolioSnapshottedV1,
     RiskLimitBreachedV1, SignalGeneratedV1,
@@ -48,9 +48,10 @@ impl ExecutionRouter {
 
     fn submit(&mut self, order: &OrderRequestV1) -> InstitutionalResult<contracts::OrderAckV1> {
         let Some(adapter) = self.adapters.get_mut(&order.venue) else {
-            return Err(InstitutionalError::NotFound {
-                resource: "missing adapter for venue".to_string(),
-            });
+            return Err(InstitutionalError::not_found(
+                OperationContext::new("services/execution-service", "submit"),
+                "missing adapter for venue",
+            ));
         };
         adapter.submit_order(order).map_err(map_trading_error)
     }
@@ -224,13 +225,13 @@ impl EventDrivenStrategyEngine {
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: "execution-service".to_owned(),
+        service_name: "execution-service".into(),
         domain: "capital_markets_execution".to_owned(),
-        approved_workflows: vec!["quant_strategy_promotion".to_owned()],
+        approved_workflows: vec!["quant_strategy_promotion".into()],
         owned_aggregates: vec![
-            "order_record".to_owned(),
-            "execution_session".to_owned(),
-            "fill_record".to_owned(),
+            "order_record".into(),
+            "execution_session".into(),
+            "fill_record".into(),
         ],
     }
 }

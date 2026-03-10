@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use contracts::KnowledgeDocumentFormatV1;
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use memvid_core::{
     AclEnforcementMode, DocumentProcessor, Memvid, PutOptions, SearchRequest, MEMVID_CORE_VERSION,
 };
@@ -183,9 +183,10 @@ impl KnowledgeMemoryProvider for MemvidMemoryProvider {
     fn open_capsule(&self, capsule_id: &str) -> InstitutionalResult<CapsuleHandle> {
         let path = self.capsule_path(capsule_id);
         if !path.exists() {
-            return Err(InstitutionalError::NotFound {
-                resource: format!("capsule `{capsule_id}`"),
-            });
+            return Err(InstitutionalError::not_found(
+                OperationContext::new("platform/runtime/memory-provider", "open_capsule"),
+                format!("capsule `{capsule_id}`"),
+            ));
         }
         Ok(CapsuleHandle {
             capsule_id: capsule_id.to_string(),
@@ -322,11 +323,15 @@ fn extract_binary_text(bytes: &[u8], mime_type: Option<&str>) -> InstitutionalRe
                 error.to_string(),
             )
         })?;
-    document
-        .text
-        .ok_or_else(|| InstitutionalError::InvariantViolation {
-            invariant: "binary document did not yield extractable text".to_string(),
-        })
+    document.text.ok_or_else(|| {
+        InstitutionalError::invariant(
+            OperationContext::new(
+                "platform/runtime/memory-provider",
+                "extract_binary_document_text",
+            ),
+            "binary document did not yield extractable text",
+        )
+    })
 }
 
 fn flatten_json(value: &serde_json::Value, prefix: Option<&str>, out: &mut Vec<String>) {

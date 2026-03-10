@@ -4,10 +4,10 @@ use identity::{ActorRef, InstitutionalRole};
 
 fn architect_action(workflow: &str) -> AgentActionRequestV1 {
     AgentActionRequestV1 {
-        action_id: format!("action::{workflow}"),
+        action_id: format!("action::{workflow}").into(),
         actor_ref: ActorRef("agent.architect_operator".to_owned()),
         objective: "Propose or execute governed change".to_owned(),
-        requested_workflow: workflow.to_owned(),
+        requested_workflow: workflow.to_owned().into(),
         impact_tier: ImpactTier::Tier2,
         classification: Classification::Restricted,
         required_approver_roles: vec![

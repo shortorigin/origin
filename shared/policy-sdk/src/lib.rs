@@ -3,34 +3,36 @@ use contracts::{
     AgentActionRequestV1, ApprovalRequestV1, PolicyDecisionRequestV1, ServiceBoundaryV1,
 };
 use error_model::InstitutionalResult;
+use futures::future::BoxFuture;
+use identity::EnvironmentId;
 use uuid::Uuid;
 
 pub trait PolicyDecisionPort {
     fn evaluate(
         &self,
         request: &PolicyDecisionRequestV1,
-    ) -> InstitutionalResult<contracts::PolicyDecisionV1>;
+    ) -> BoxFuture<'_, InstitutionalResult<contracts::PolicyDecisionV1>>;
 }
 
 pub trait ApprovalVerificationPort {
     fn verify(
         &self,
         request: &ApprovalRequestV1,
-    ) -> InstitutionalResult<Vec<contracts::ApprovalDecisionV1>>;
+    ) -> BoxFuture<'_, InstitutionalResult<Vec<contracts::ApprovalDecisionV1>>>;
 }
 
 #[must_use]
 pub fn build_policy_request(
     action: &AgentActionRequestV1,
     service_boundary: &ServiceBoundaryV1,
-    environment: impl Into<String>,
+    environment: impl Into<EnvironmentId>,
     cross_domain: bool,
 ) -> PolicyDecisionRequestV1 {
     PolicyDecisionRequestV1 {
-        request_id: Uuid::new_v4().to_string(),
+        request_id: Uuid::new_v4().to_string().into(),
         actor_ref: action.actor_ref.clone(),
         action: action.requested_workflow.clone(),
-        resource: service_boundary.service_name.clone(),
+        resource: service_boundary.service_name.clone().into(),
         environment: environment.into(),
         impact_tier: action.impact_tier,
         classification: action.classification,

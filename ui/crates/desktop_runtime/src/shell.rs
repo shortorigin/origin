@@ -63,7 +63,7 @@ pub fn build_command_service(
                             runtime.dispatch_action(DesktopAction::PushTerminalHistory {
                                 command: request.line.clone(),
                             });
-                            submit_session.submit(request);
+                            submit_session.submit(request)
                         }
                     }),
                     Rc::new(move || cancel_session.cancel()),

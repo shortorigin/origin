@@ -8,12 +8,12 @@ version.workspace = true
 [dependencies]
 contracts = { path = "../../schemas/crates/contracts" }
 error-model = { path = "../../shared/error-model" }
+identity = { path = "../../shared/identity" }
 serde.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
 error-model = { path = "../../shared/error-model" }
-identity = { path = "../../shared/identity" }
 
 [lints]
 workspace = true

@@ -20,9 +20,10 @@ use contracts::{
     WatchlistIndicatorV1,
 };
 use enforcement::ApprovedMutationContext;
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use events::{EventEnvelopeV1, RecordedEventV1};
-use identity::ActorRef;
+use governed_storage::KnowledgeStore;
+use identity::{ActorRef, EvidenceId, ServiceId, WorkflowId};
 use memory_provider::{
     CapsuleBuildRequest, CapsuleDocument, CapsuleSearchRequest, KnowledgeMemoryProvider,
 };
@@ -30,8 +31,7 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
-use surrealdb::Connection;
-use surrealdb_access::SurrealRepositoryContext;
+use telemetry::DecisionRef;
 use trading_core::{Clock, IdGenerator, SystemClock, SystemIdGenerator};
 
 const SERVICE_NAME: &str = "knowledge-service";
@@ -47,6 +47,18 @@ const OWNED_AGGREGATES: &[&str] = &[
 ];
 const ANALYSIS_TIMEZONE: &str = "America/Los_Angeles";
 const ANALYSIS_AS_OF_DATE: &str = "2026-03-09";
+
+fn service_id() -> ServiceId {
+    SERVICE_NAME.into()
+}
+
+fn knowledge_publication_workflow_id() -> WorkflowId {
+    "knowledge_publication".into()
+}
+
+fn knowledge_context(operation: &str) -> OperationContext {
+    OperationContext::new("services/knowledge-service", operation).with_service_id(service_id())
+}
 
 #[derive(Clone)]
 pub struct KnowledgeService<M>
@@ -93,41 +105,41 @@ where
         self
     }
 
-    pub async fn ingest_sources<C>(
+    pub async fn ingest_sources<R>(
         &self,
         context: &ApprovedMutationContext,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: KnowledgeSourceIngestRequestV1,
     ) -> InstitutionalResult<Vec<KnowledgeSourceV1>>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
-        context.assert_workflow("knowledge_publication")?;
-        context.assert_target_service(SERVICE_NAME)?;
+        context.assert_workflow(&knowledge_publication_workflow_id())?;
+        context.assert_target_service(&service_id())?;
         self.ingest_sources_unchecked(repositories, request).await
     }
 
-    pub async fn publish_capsule<C>(
+    pub async fn publish_capsule<R>(
         &self,
         context: &ApprovedMutationContext,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: KnowledgePublicationRequestV1,
     ) -> InstitutionalResult<KnowledgeCapsuleV1>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
-        context.assert_workflow("knowledge_publication")?;
-        context.assert_target_service(SERVICE_NAME)?;
+        context.assert_workflow(&knowledge_publication_workflow_id())?;
+        context.assert_target_service(&service_id())?;
         self.publish_capsule_unchecked(repositories, request).await
     }
 
-    pub async fn generate_analysis<C>(
+    pub async fn generate_analysis<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: MacroFinancialAnalysisRequestV1,
     ) -> InstitutionalResult<MacroFinancialAnalysisV1>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
         let sources = self.resolve_sources(repositories, &request).await?;
         let source_governance =
@@ -138,9 +150,10 @@ where
             .cloned()
             .collect::<Vec<_>>();
         if evidence_sources.is_empty() && direct_inputs_are_empty(&request.direct_inputs) {
-            return Err(InstitutionalError::NotFound {
-                resource: "macro-financial analysis sources or direct inputs".to_string(),
-            });
+            return Err(InstitutionalError::not_found(
+                knowledge_context("generate_analysis"),
+                "macro-financial analysis sources or direct inputs",
+            ));
         }
         validate_required_output_format(&request.constraints)?;
 
@@ -280,38 +293,33 @@ where
         };
         analysis.rendered_output = render_analysis(&analysis);
 
+        repositories.store_analysis(analysis.clone()).await?;
         repositories
-            .knowledge_analyses()
-            .store(analysis.clone())
-            .await?;
-        repositories
-            .evidence_manifests()
-            .store(
+            .store_evidence(
                 format!("evidence::{}", analysis.analysis_id),
                 contracts::EvidenceManifestV1 {
-                    evidence_id: format!("evidence::{}", analysis.analysis_id),
+                    evidence_id: EvidenceId::from(format!("evidence::{}", analysis.analysis_id)),
                     producer: SERVICE_NAME.to_string(),
                     artifact_hash: sha256_hex(analysis.rendered_output.as_bytes()),
-                    storage_ref: format!("surrealdb:knowledge_analysis/{}", analysis.analysis_id),
+                    storage_ref: format!("knowledge-store:analysis/{}", analysis.analysis_id),
                     retention_class: "institutional_record".to_string(),
                     classification: request.classification,
                     related_decision_refs: analysis
                         .claim_evidence
                         .iter()
-                        .map(|claim| claim.claim_id.clone())
+                        .map(|claim| DecisionRef::from(claim.claim_id.clone()))
                         .chain(
                             analysis
                                 .inference_steps
                                 .iter()
-                                .map(|inference| inference.inference_id.clone()),
+                                .map(|inference| DecisionRef::from(inference.inference_id.clone())),
                         )
                         .collect(),
                 },
             )
             .await?;
         repositories
-            .recorded_events()
-            .append(
+            .append_event(
                 self.ids.next_id(),
                 RecordedEventV1 {
                     envelope: EventEnvelopeV1::new(
@@ -333,8 +341,7 @@ where
             .await?;
         for source in &evidence_sources {
             repositories
-                .knowledge_edges()
-                .store(KnowledgeEdgeV1 {
+                .store_edge(KnowledgeEdgeV1 {
                     edge_id: self.ids.next_id(),
                     from_id: analysis.analysis_id.clone(),
                     to_id: source.source_id.clone(),
@@ -345,8 +352,7 @@ where
         }
         if let Some(capsule_id) = &analysis.capsule_id {
             repositories
-                .knowledge_edges()
-                .store(KnowledgeEdgeV1 {
+                .store_edge(KnowledgeEdgeV1 {
                     edge_id: self.ids.next_id(),
                     from_id: analysis.analysis_id.clone(),
                     to_id: capsule_id.clone(),
@@ -359,38 +365,34 @@ where
         Ok(analysis)
     }
 
-    pub async fn load_analysis<C>(
+    pub async fn load_analysis<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         analysis_id: &str,
     ) -> InstitutionalResult<Option<MacroFinancialAnalysisV1>>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
-        Ok(repositories
-            .knowledge_analyses()
-            .load(analysis_id)
-            .await?
-            .map(|record| record.analysis))
+        repositories.load_analysis(analysis_id).await
     }
 
-    pub async fn latest_publication_status<C>(
+    pub async fn latest_publication_status<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
     ) -> InstitutionalResult<Option<KnowledgePublicationStatusV1>>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
-        repositories.knowledge_capsules().latest_status().await
+        repositories.latest_publication_status().await
     }
 
-    pub async fn ingest_sources_unchecked<C>(
+    pub async fn ingest_sources_unchecked<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: KnowledgeSourceIngestRequestV1,
     ) -> InstitutionalResult<Vec<KnowledgeSourceV1>>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
         let mut sources = Vec::with_capacity(request.sources.len());
         for spec in &request.sources {
@@ -432,13 +434,9 @@ where
                 bytes.as_ref(),
                 &mime_type,
             )?;
+            repositories.store_source(source.clone()).await?;
             repositories
-                .knowledge_sources()
-                .store(source.clone())
-                .await?;
-            repositories
-                .recorded_events()
-                .append(
+                .append_event(
                     self.ids.next_id(),
                     RecordedEventV1 {
                         envelope: EventEnvelopeV1::new(
@@ -463,50 +461,40 @@ where
         Ok(sources)
     }
 
-    pub async fn publish_capsule_unchecked<C>(
+    pub async fn publish_capsule_unchecked<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: KnowledgePublicationRequestV1,
     ) -> InstitutionalResult<KnowledgeCapsuleV1>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
-        let source_records = repositories
-            .knowledge_sources()
-            .load_many(&request.source_ids)
-            .await?;
-        if source_records.len() != request.source_ids.len() {
-            return Err(InstitutionalError::NotFound {
-                resource: "one or more knowledge sources".to_string(),
-            });
+        let sources = repositories.load_sources(&request.source_ids).await?;
+        if sources.len() != request.source_ids.len() {
+            return Err(InstitutionalError::not_found(
+                knowledge_context("publish_capsule_unchecked"),
+                "one or more knowledge sources",
+            ));
         }
-        let source_governance = validate_selected_sources_against_constraints(
-            &source_records
-                .iter()
-                .map(|record| record.source.clone())
-                .collect::<Vec<_>>(),
-            &request.constraints,
-        )?;
+        let source_governance =
+            validate_selected_sources_against_constraints(&sources, &request.constraints)?;
 
-        let documents = source_records
+        let documents = sources
             .iter()
-            .map(|record| CapsuleDocument {
-                document_id: record.source.source_id.clone(),
-                title: record.source.title.clone(),
-                uri: format!("knowledge://source/{}", record.source.source_id),
-                content: record.source.content_text.clone(),
+            .map(|source| CapsuleDocument {
+                document_id: source.source_id.clone(),
+                title: source.title.clone(),
+                uri: format!("knowledge://source/{}", source.source_id),
+                content: source.content_text.clone(),
                 metadata: BTreeMap::from([
-                    ("source_id".to_string(), record.source.source_id.clone()),
+                    ("source_id".to_string(), source.source_id.clone()),
                     (
                         "provider".to_string(),
-                        source_kind_label(record.source.kind).to_string(),
+                        source_kind_label(source.kind).to_string(),
                     ),
-                    (
-                        "country_area".to_string(),
-                        record.source.country_area.clone(),
-                    ),
+                    ("country_area".to_string(), source.country_area.clone()),
                 ]),
-                search_text: Some(record.source.content_text.clone()),
+                search_text: Some(source.content_text.clone()),
             })
             .collect::<Vec<_>>();
         let build = self.memory_provider.build_capsule(&CapsuleBuildRequest {
@@ -518,7 +506,7 @@ where
             publication_id: request.publication_id.clone(),
             title: request.title,
             source_ids: request.source_ids.clone(),
-            source_count: source_records.len(),
+            source_count: sources.len(),
             storage_ref: build.storage_ref,
             artifact_hash: build.artifact_hash,
             version: build.version,
@@ -527,13 +515,9 @@ where
             classification: request.classification,
             retention_class: request.retention_class,
         };
+        repositories.store_capsule(capsule.clone()).await?;
         repositories
-            .knowledge_capsules()
-            .store(capsule.clone())
-            .await?;
-        repositories
-            .recorded_events()
-            .append(
+            .append_event(
                 self.ids.next_id(),
                 RecordedEventV1 {
                     envelope: EventEnvelopeV1::new(
@@ -553,17 +537,16 @@ where
                 },
             )
             .await?;
-        for source in &source_records {
+        for source in &sources {
             repositories
-                .knowledge_edges()
-                .store(KnowledgeEdgeV1 {
+                .store_edge(KnowledgeEdgeV1 {
                     edge_id: self.ids.next_id(),
                     from_id: capsule.capsule_id.clone(),
-                    to_id: source.source.source_id.clone(),
+                    to_id: source.source_id.clone(),
                     relationship: KnowledgeRelationshipV1::DerivedFrom,
                     rationale: source_governance
                         .iter()
-                        .find(|decision| decision.source_id == source.source.source_id)
+                        .find(|decision| decision.source_id == source.source_id)
                         .map_or_else(
                             || "Capsule compiled from governed source text.".to_string(),
                             |decision| decision.reasons.join(" | "),
@@ -574,42 +557,32 @@ where
         Ok(capsule)
     }
 
-    async fn resolve_sources<C>(
+    async fn resolve_sources<R>(
         &self,
-        repositories: &SurrealRepositoryContext<C>,
+        repositories: &R,
         request: &MacroFinancialAnalysisRequestV1,
     ) -> InstitutionalResult<Vec<KnowledgeSourceV1>>
     where
-        C: Connection,
+        R: KnowledgeStore,
     {
         if !request.source_ids.is_empty() {
-            let sources = repositories
-                .knowledge_sources()
-                .load_many(&request.source_ids)
-                .await?
-                .into_iter()
-                .map(|record| record.source)
-                .collect::<Vec<_>>();
+            let sources = repositories.load_sources(&request.source_ids).await?;
             if sources.len() != request.source_ids.len() {
-                return Err(InstitutionalError::NotFound {
-                    resource: "one or more requested knowledge sources".to_string(),
-                });
+                return Err(InstitutionalError::not_found(
+                    knowledge_context("resolve_sources"),
+                    "one or more requested knowledge sources",
+                ));
             }
             return Ok(sources);
         }
         if let Some(capsule_id) = &request.capsule_id {
-            if let Some(capsule) = repositories.knowledge_capsules().load(capsule_id).await? {
-                let sources = repositories
-                    .knowledge_sources()
-                    .load_many(&capsule.capsule.source_ids)
-                    .await?
-                    .into_iter()
-                    .map(|record| record.source)
-                    .collect::<Vec<_>>();
-                if sources.len() != capsule.capsule.source_ids.len() {
-                    return Err(InstitutionalError::NotFound {
-                        resource: "one or more capsule knowledge sources".to_string(),
-                    });
+            if let Some(capsule) = repositories.load_capsule(capsule_id).await? {
+                let sources = repositories.load_sources(&capsule.source_ids).await?;
+                if sources.len() != capsule.source_ids.len() {
+                    return Err(InstitutionalError::not_found(
+                        knowledge_context("resolve_sources"),
+                        "one or more capsule knowledge sources",
+                    ));
                 }
                 return Ok(sources);
             }
@@ -738,9 +711,10 @@ fn validate_source_url(
         .host_str()
         .ok_or_else(|| InstitutionalError::parse("knowledge source url", "missing host"))?;
     if is_social_media_host(host) {
-        return Err(InstitutionalError::PolicyDenied {
-            reason: format!("social media host `{host}` is not admissible evidence"),
-        });
+        return Err(InstitutionalError::policy_denied(
+            knowledge_context("validate_source_url"),
+            format!("social media host `{host}` is not admissible evidence"),
+        ));
     }
     let allowed = match spec.kind {
         KnowledgeSourceKindV1::Imf => host_matches(host, "imf.org"),
@@ -778,9 +752,10 @@ fn validate_source_url(
     {
         Ok(())
     } else {
-        Err(InstitutionalError::PolicyDenied {
-            reason: format!("source host `{host}` is not allowed for {:?}", spec.kind),
-        })
+        Err(InstitutionalError::policy_denied(
+            knowledge_context("validate_source_url"),
+            format!("source host `{host}` is not allowed for {:?}", spec.kind),
+        ))
     }
 }
 
@@ -834,9 +809,10 @@ fn evaluate_source_governance(
             )
         });
     if !allowed {
-        return Err(InstitutionalError::PolicyDenied {
-            reason: format!("source `{source_id}` is outside the allowed source set"),
-        });
+        return Err(InstitutionalError::policy_denied(
+            knowledge_context("validate_source_selection"),
+            format!("source `{source_id}` is outside the allowed source set"),
+        ));
     }
     if constraints.forbidden_sources.iter().any(|constraint| {
         source_matches_constraint(
@@ -849,9 +825,10 @@ fn evaluate_source_governance(
             provenance_tier,
         )
     }) {
-        return Err(InstitutionalError::PolicyDenied {
-            reason: format!("source `{source_id}` matched a forbidden source rule"),
-        });
+        return Err(InstitutionalError::policy_denied(
+            knowledge_context("validate_source_selection"),
+            format!("source `{source_id}` matched a forbidden source rule"),
+        ));
     }
 
     if provenance_tier == KnowledgeSourceProvenanceV1::Secondary {
@@ -923,9 +900,10 @@ fn validate_required_output_format(constraints: &SourceConstraintsV1) -> Institu
             && normalized != "strict"
             && normalized != "strict_template"
         {
-            return Err(InstitutionalError::PolicyDenied {
-                reason: format!("required output format `{format}` is not supported"),
-            });
+            return Err(InstitutionalError::validation(
+                knowledge_context("validate_required_output_format"),
+                format!("required output format `{format}` is not supported"),
+            ));
         }
     }
     Ok(())
@@ -2859,15 +2837,23 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    mod contract_parity {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testing/contract_parity.rs"
+        ));
+    }
+
     use std::net::SocketAddr;
 
     use approval_service::ApprovalService;
     use chrono::{Duration, TimeZone};
+    use contract_parity::assert_service_boundary_matches_catalog;
     use contracts::{AnalysisHorizonV1, AnalysisObjectiveV1};
     use evidence_service::EvidenceService;
+    use governed_storage::connect_in_memory;
     use memory_provider::MemvidMemoryProvider;
     use policy_service::PolicyService;
-    use surrealdb_access::connect_in_memory;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use tokio::task::JoinHandle;
@@ -3261,14 +3247,7 @@ mod tests {
             include_str!("../../../enterprise/domains/data_knowledge/service_boundaries.toml");
         let boundary = service_boundary();
 
-        assert_eq!(boundary.service_name, SERVICE_NAME);
-        assert_eq!(boundary.domain, DOMAIN_NAME);
-        for workflow in APPROVED_WORKFLOWS {
-            assert!(source.contains(workflow));
-        }
-        for aggregate in OWNED_AGGREGATES {
-            assert!(source.contains(aggregate));
-        }
+        assert_service_boundary_matches_catalog(&boundary, DOMAIN_NAME, source);
     }
 
     #[tokio::test]
@@ -3288,10 +3267,10 @@ mod tests {
             EvidenceService::default(),
         );
         let action = contracts::AgentActionRequestV1 {
-            action_id: "action-1".to_string(),
+            action_id: "action-1".into(),
             actor_ref: identity::ActorRef("agent:finance".to_string()),
             objective: "Compile macro-financial sources".to_string(),
-            requested_workflow: "knowledge_publication".to_string(),
+            requested_workflow: "knowledge_publication".into(),
             impact_tier: contracts::ImpactTier::Tier0,
             classification: Classification::Internal,
             required_approver_roles: Vec::new(),
@@ -3300,15 +3279,15 @@ mod tests {
         let mut approved = None;
         let guarded_request = enforcement::GuardedMutationRequest {
             action_id: action.action_id.clone(),
-            workflow_name: "knowledge_publication".to_string(),
-            target_service: SERVICE_NAME.to_string(),
-            target_aggregate: "knowledge_source".to_string(),
+            workflow_name: "knowledge_publication".into(),
+            target_service: SERVICE_NAME.into(),
+            target_aggregate: "knowledge_source".into(),
             actor_ref: action.actor_ref.clone(),
             impact_tier: action.impact_tier,
             classification: action.classification,
             policy_refs: action.policy_refs.clone(),
             required_approver_roles: action.required_approver_roles.clone(),
-            environment: "prod".to_string(),
+            environment: "prod".into(),
             cross_domain: false,
         };
         engine
@@ -3316,6 +3295,7 @@ mod tests {
                 approved = Some(context.clone());
                 Ok(())
             })
+            .await
             .expect("authorize");
         let context = approved.expect("context");
         let ingested = service

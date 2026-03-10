@@ -3,13 +3,13 @@ use contracts::{
     KnowledgeSourceIngestRequestV1, WorkflowBoundaryV1,
 };
 use enforcement::GuardedMutationRequest;
-use error_model::{InstitutionalError, InstitutionalResult};
+use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use evidence_sdk::EvidenceSink;
+use governed_storage::KnowledgeStore;
+use identity::{AggregateId, EnvironmentId, ServiceId, WorkflowId};
 use knowledge_service::KnowledgeService;
 use orchestrator::WorkflowEngine;
 use policy_sdk::{ApprovalVerificationPort, PolicyDecisionPort};
-use surrealdb::Connection;
-use surrealdb_access::SurrealRepositoryContext;
 
 #[must_use]
 pub fn workflow_boundary() -> WorkflowBoundaryV1 {
@@ -25,10 +25,10 @@ pub fn workflow_boundary() -> WorkflowBoundaryV1 {
     }
 }
 
-pub async fn execute<P, A, E, M, C>(
+pub async fn execute<P, A, E, M, R>(
     engine: &mut WorkflowEngine<P, A, E>,
     knowledge_service: &KnowledgeService<M>,
-    repositories: &SurrealRepositoryContext<C>,
+    repositories: &R,
     action: &AgentActionRequestV1,
     ingest_request: KnowledgeSourceIngestRequestV1,
     publication_request: KnowledgePublicationRequestV1,
@@ -38,29 +38,34 @@ where
     A: ApprovalVerificationPort,
     E: EvidenceSink,
     M: memory_provider::KnowledgeMemoryProvider + Clone,
-    C: Connection,
+    R: KnowledgeStore,
 {
     let guarded_request = GuardedMutationRequest {
         action_id: action.action_id.clone(),
-        workflow_name: "knowledge_publication".to_owned(),
-        target_service: "knowledge-service".to_owned(),
-        target_aggregate: "knowledge_capsule".to_owned(),
+        workflow_name: WorkflowId::from("knowledge_publication"),
+        target_service: ServiceId::from("knowledge-service"),
+        target_aggregate: AggregateId::from("knowledge_capsule"),
         actor_ref: action.actor_ref.clone(),
         impact_tier: action.impact_tier,
         classification: action.classification,
         policy_refs: action.policy_refs.clone(),
         required_approver_roles: action.required_approver_roles.clone(),
-        environment: "prod".to_owned(),
+        environment: EnvironmentId::from("prod"),
         cross_domain: false,
     };
 
     let mut approved_context = None;
-    engine.execute_mutation(guarded_request, |context| {
-        approved_context = Some(context.clone());
-        Ok(())
-    })?;
-    let context = approved_context.ok_or_else(|| InstitutionalError::InvariantViolation {
-        invariant: "knowledge publication authorization context missing".to_string(),
+    engine
+        .execute_mutation(guarded_request, |context| {
+            approved_context = Some(context.clone());
+            Ok(())
+        })
+        .await?;
+    let context = approved_context.ok_or_else(|| {
+        InstitutionalError::invariant(
+            OperationContext::new("workflows/knowledge_publication", "execute"),
+            "knowledge publication authorization context missing",
+        )
     })?;
 
     knowledge_service
@@ -79,10 +84,10 @@ mod tests {
     use approval_service::ApprovalService;
     use chrono::{TimeZone, Utc};
     use evidence_service::EvidenceService;
+    use governed_storage::{connect_in_memory, KnowledgeStore};
     use memory_provider::MemvidMemoryProvider;
     use orchestrator::WorkflowEngine;
     use policy_service::PolicyService;
-    use surrealdb_access::connect_in_memory;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use trading_core::{FixedClock, SequenceIdGenerator};
@@ -141,10 +146,10 @@ mod tests {
             EvidenceService::default(),
         );
         let action = contracts::AgentActionRequestV1 {
-            action_id: "action-1".to_string(),
+            action_id: "action-1".into(),
             actor_ref: identity::ActorRef("agent:strategist".to_string()),
             objective: "Publish macro knowledge capsule".to_string(),
-            requested_workflow: "knowledge_publication".to_string(),
+            requested_workflow: "knowledge_publication".into(),
             impact_tier: contracts::ImpactTier::Tier0,
             classification: contracts::Classification::Internal,
             required_approver_roles: Vec::new(),
@@ -203,15 +208,16 @@ mod tests {
         .expect("execute");
 
         assert_eq!(status.capsule_id, "capsule-1");
+        assert_eq!(
+            repositories
+                .load_sources(&["source-fred".to_string()])
+                .await
+                .expect("load sources")
+                .len(),
+            1
+        );
         assert!(repositories
-            .knowledge_sources()
-            .load("source-fred")
-            .await
-            .expect("load")
-            .is_some());
-        assert!(repositories
-            .knowledge_capsules()
-            .load("capsule-1")
+            .load_capsule("capsule-1")
             .await
             .expect("load")
             .is_some());

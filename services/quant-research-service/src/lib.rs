@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 
-use contracts::{ExperimentResultV1, ResearchTaskV1, ServiceBoundaryV1};
+use contracts::{ExperimentMetadataV1, ExperimentResultV1, ResearchTaskV1, ServiceBoundaryV1};
 use error_model::{InstitutionalError, InstitutionalResult};
 use trading_errors::TradingError;
 use trading_sim::{run_trend_sweep, DeterministicBacktestEngine, SweepJob};
@@ -140,7 +140,9 @@ impl QuantResearchService {
             let experiment = ExperimentResultV1 {
                 config_hash: result.config_hash.clone(),
                 summary: result.summary.clone(),
-                metadata: serde_json::json!({ "trade_count": result.trade_count }),
+                metadata: ExperimentMetadataV1 {
+                    trade_count: Some(result.trade_count),
+                },
             };
             self.register(experiment.clone());
             results.push(experiment);
@@ -178,36 +180,35 @@ pub fn ai_assisted_summary(results: &[ExperimentResultV1]) -> String {
 #[must_use]
 pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
-        service_name: SERVICE_NAME.to_owned(),
+        service_name: SERVICE_NAME.into(),
         domain: DOMAIN_NAME.to_owned(),
-        approved_workflows: APPROVED_WORKFLOWS
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-        owned_aggregates: OWNED_AGGREGATES
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        approved_workflows: APPROVED_WORKFLOWS.iter().copied().map(Into::into).collect(),
+        owned_aggregates: OWNED_AGGREGATES.iter().copied().map(Into::into).collect(),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    mod contract_parity {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testing/contract_parity.rs"
+        ));
+    }
+
     use std::collections::BTreeMap;
 
     use chrono::{Duration, TimeZone, Utc};
+    use contract_parity::assert_service_boundary_matches_catalog;
     use contracts::{
-        AssetClassV1, ExperimentResultV1, MarketEventV1, OhlcvBarV1, PerformanceSummaryV1,
-        ResearchTaskV1, SymbolV1, VenueV1,
+        AssetClassV1, ExperimentMetadataV1, ExperimentResultV1, MarketEventV1, OhlcvBarV1,
+        PerformanceSummaryV1, ResearchTaskV1, SymbolV1, VenueV1,
     };
     use trading_core::{
         build_feature_rows, experiment_config_hash, walk_forward, BasicLinearModel,
     };
 
-    use super::{
-        ai_assisted_summary, service_boundary, QuantResearchService, APPROVED_WORKFLOWS,
-        DOMAIN_NAME, OWNED_AGGREGATES, SERVICE_NAME,
-    };
+    use super::{ai_assisted_summary, service_boundary, QuantResearchService, DOMAIN_NAME};
 
     #[test]
     fn service_boundary_matches_enterprise_catalog() {
@@ -216,14 +217,7 @@ mod tests {
         );
         let boundary = service_boundary();
 
-        assert_eq!(boundary.service_name, SERVICE_NAME);
-        assert_eq!(boundary.domain, DOMAIN_NAME);
-        for workflow in APPROVED_WORKFLOWS {
-            assert!(source.contains(workflow));
-        }
-        for aggregate in OWNED_AGGREGATES {
-            assert!(source.contains(aggregate));
-        }
+        assert_service_boundary_matches_catalog(&boundary, DOMAIN_NAME, source);
     }
 
     #[test]
@@ -237,7 +231,7 @@ mod tests {
                 max_drawdown: 0.1,
                 turnover: 1.0,
             },
-            metadata: serde_json::json!({}),
+            metadata: ExperimentMetadataV1 { trade_count: None },
         });
         service.register(ExperimentResultV1 {
             config_hash: "a".to_string(),
@@ -247,7 +241,7 @@ mod tests {
                 max_drawdown: 0.1,
                 turnover: 1.0,
             },
-            metadata: serde_json::json!({}),
+            metadata: ExperimentMetadataV1 { trade_count: None },
         });
         let ranked = service.ranked();
         assert_eq!(ranked[0].config_hash, "a");
@@ -315,7 +309,7 @@ mod tests {
                 max_drawdown: 0.05,
                 turnover: 0.8,
             },
-            metadata: serde_json::json!({}),
+            metadata: ExperimentMetadataV1 { trade_count: None },
         }]);
         assert!(text.contains("Top experiment"));
     }

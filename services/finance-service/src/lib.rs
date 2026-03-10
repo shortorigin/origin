@@ -1,11 +1,20 @@
 use contracts::{ServiceBoundaryV1, TreasuryDisbursementRecordedV1, TreasuryDisbursementRequestV1};
 use enforcement::ApprovedMutationContext;
 use error_model::InstitutionalResult;
+use identity::{ServiceId, WorkflowId};
 
 const SERVICE_NAME: &str = "finance-service";
 const DOMAIN_NAME: &str = "finance_treasury";
 const APPROVED_WORKFLOWS: &[&str] = &["payroll", "treasury_disbursement"];
 const OWNED_AGGREGATES: &[&str] = &["treasury_ledger", "payroll_batch"];
+
+fn service_id() -> ServiceId {
+    SERVICE_NAME.into()
+}
+
+fn treasury_disbursement_workflow_id() -> WorkflowId {
+    "treasury_disbursement".into()
+}
 
 #[derive(Debug, Default, Clone)]
 struct InMemoryDisbursementLedger {
@@ -33,8 +42,8 @@ impl FinanceService {
         context: &ApprovedMutationContext,
         request: TreasuryDisbursementRequestV1,
     ) -> InstitutionalResult<TreasuryDisbursementRecordedV1> {
-        context.assert_workflow("treasury_disbursement")?;
-        context.assert_target_service(SERVICE_NAME)?;
+        context.assert_workflow(&treasury_disbursement_workflow_id())?;
+        context.assert_target_service(&service_id())?;
 
         let approved_by_roles = context
             .approvals()
@@ -61,22 +70,27 @@ pub fn service_boundary() -> ServiceBoundaryV1 {
     ServiceBoundaryV1 {
         service_name: SERVICE_NAME.to_owned(),
         domain: DOMAIN_NAME.to_owned(),
-        approved_workflows: APPROVED_WORKFLOWS
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        approved_workflows: APPROVED_WORKFLOWS.iter().copied().map(Into::into).collect(),
         owned_aggregates: OWNED_AGGREGATES
             .iter()
-            .map(|value| (*value).to_owned())
+            .copied()
+            .map(str::to_owned)
             .collect(),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        service_boundary, APPROVED_WORKFLOWS, DOMAIN_NAME, OWNED_AGGREGATES, SERVICE_NAME,
-    };
+    mod contract_parity {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testing/contract_parity.rs"
+        ));
+    }
+
+    use contract_parity::assert_service_boundary_matches_catalog;
+
+    use super::{service_boundary, DOMAIN_NAME};
 
     #[test]
     fn service_boundary_matches_enterprise_catalog() {
@@ -84,13 +98,6 @@ mod tests {
             include_str!("../../../enterprise/domains/finance_treasury/service_boundaries.toml");
         let boundary = service_boundary();
 
-        assert_eq!(boundary.service_name, SERVICE_NAME);
-        assert_eq!(boundary.domain, DOMAIN_NAME);
-        for workflow in APPROVED_WORKFLOWS {
-            assert!(source.contains(workflow));
-        }
-        for aggregate in OWNED_AGGREGATES {
-            assert!(source.contains(aggregate));
-        }
+        assert_service_boundary_matches_catalog(&boundary, DOMAIN_NAME, source);
     }
 }

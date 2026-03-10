@@ -181,6 +181,28 @@ cargo xtask plugin validate-manifests
 cargo xtask github audit-process
 ```
 
+## Rust Boundary Invariants
+
+Repository changes must preserve these implementation rules:
+
+- Foundational crates shared across multiple workspace members inherit versions from
+  `[workspace.dependencies]`; any crate-local exception must be explicit and justified.
+- Workspace manifests may not declare `workspace = true` for dependencies missing from the root
+  manifest, and local path dependencies must resolve to declared workspace members unless the
+  externalization is documented.
+- IO-bearing ports use async-capable traits or future-returning interfaces; production code must
+  not hide blocking or in-memory prototype seams behind synchronous abstractions.
+- Parse and validate boundary identifiers once at ingress, then use typed IDs internally across
+  services, workflows, platform runtime, and event envelopes.
+- Untyped `serde_json::Value` is reserved for explicit interop, persistence, or host/plugin edges;
+  core runtime paths prefer typed structs, enums, and versioned envelopes.
+- Contract validation tests parse catalog or fixture artifacts semantically; substring assertions
+  against raw TOML, JSON, or source text are not sufficient.
+- Simulation and heuristic adapters remain outside default production paths unless a feature flag
+  or explicit dependency injection documents the mode.
+- UI shell sessions run one foreground execution at a time and keep bounded, sequenced event
+  retention so restore and long-lived sessions remain deterministic.
+
 ## Release Promotion
 
 - `main` remains continuously mergeable after required checks pass.

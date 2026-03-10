@@ -13,10 +13,10 @@ use treasury_disbursement::execute;
 
 fn build_action(action_id: &str) -> AgentActionRequestV1 {
     AgentActionRequestV1 {
-        action_id: action_id.to_owned(),
+        action_id: action_id.to_owned().into(),
         actor_ref: ActorRef("agent.finance_analyst".to_owned()),
         objective: "Release approved treasury disbursement".to_owned(),
-        requested_workflow: "treasury_disbursement".to_owned(),
+        requested_workflow: "treasury_disbursement".into(),
         impact_tier: ImpactTier::Tier3,
         classification: Classification::Restricted,
         required_approver_roles: vec![InstitutionalRole::CFO, InstitutionalRole::CHRO],
@@ -34,8 +34,8 @@ fn build_request() -> TreasuryDisbursementRequestV1 {
     }
 }
 
-#[test]
-fn treasury_disbursement_rejects_missing_approval() {
+#[tokio::test]
+async fn treasury_disbursement_rejects_missing_approval() {
     let policy_service = PolicyService::institutional_default();
     let approval_service = ApprovalService::default();
     let evidence_service = EvidenceService::default();
@@ -47,17 +47,18 @@ fn treasury_disbursement_rejects_missing_approval() {
         &mut finance_service,
         &build_action("action::treasury::missing"),
         build_request(),
-    );
+    )
+    .await;
 
     assert!(matches!(
         result,
-        Err(error_model::InstitutionalError::ApprovalMissing { .. })
+        Err(error_model::InstitutionalError::ApprovalDenied { .. })
     ));
     assert_eq!(finance_service.disbursements().len(), 0);
 }
 
-#[test]
-fn treasury_disbursement_accepts_policy_and_dual_approval() {
+#[tokio::test]
+async fn treasury_disbursement_accepts_policy_and_dual_approval() {
     let policy_service = PolicyService::institutional_default();
     let mut approval_service = ApprovalService::default();
     let evidence_service = EvidenceService::default();
@@ -84,10 +85,12 @@ fn treasury_disbursement_accepts_policy_and_dual_approval() {
 
     let mut engine = WorkflowEngine::new(policy_service, approval_service, evidence_service);
     let mut finance_service = FinanceService::default();
-    let result = execute(&mut engine, &mut finance_service, &action, request).unwrap();
+    let result = execute(&mut engine, &mut finance_service, &action, request)
+        .await
+        .unwrap();
 
     assert_eq!(result.amount_minor, 25_000);
     assert_eq!(result.approved_by_roles.len(), 2);
     assert_eq!(finance_service.disbursements().len(), 1);
-    assert_eq!(engine.recorded_evidence().len(), 1);
+    assert_eq!(engine.recorded_evidence().await.unwrap().len(), 1);
 }

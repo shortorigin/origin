@@ -16,12 +16,125 @@ use quant_research_service::QuantResearchService;
 use quant_strategy_promotion::{execute, PipelineSummary};
 use strategy_review::workflow_boundary as strategy_review_boundary;
 
+fn assert_compliance_report_semantics(
+    actual: &contracts::ComplianceReportV1,
+    expected: &contracts::ComplianceReportV1,
+) {
+    assert_eq!(
+        actual
+            .order_audit_records
+            .iter()
+            .map(|record| {
+                (
+                    record.order.strategy_id.clone(),
+                    record.order.symbol.clone(),
+                    record.order.venue,
+                    record.order.side,
+                    record.order.quantity,
+                    record.order.limit_price,
+                    record.order.order_type,
+                    record.order.tif,
+                    record.decision_trace.clone(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        expected
+            .order_audit_records
+            .iter()
+            .map(|record| {
+                (
+                    record.order.strategy_id.clone(),
+                    record.order.symbol.clone(),
+                    record.order.venue,
+                    record.order.side,
+                    record.order.quantity,
+                    record.order.limit_price,
+                    record.order.order_type,
+                    record.order.tif,
+                    record.decision_trace.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        actual
+            .limit_breach_records
+            .iter()
+            .map(|record| {
+                (
+                    record.control.clone(),
+                    record.severity.clone(),
+                    record.details.clone(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        expected
+            .limit_breach_records
+            .iter()
+            .map(|record| {
+                (
+                    record.control.clone(),
+                    record.severity.clone(),
+                    record.details.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        actual
+            .best_execution_records
+            .iter()
+            .map(|record| {
+                (
+                    record.venue,
+                    record.slippage_bps,
+                    record.expected_price,
+                    record.executed_price,
+                )
+            })
+            .collect::<Vec<_>>(),
+        expected
+            .best_execution_records
+            .iter()
+            .map(|record| {
+                (
+                    record.venue,
+                    record.slippage_bps,
+                    record.expected_price,
+                    record.executed_price,
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        actual.compliance_report_fields(),
+        expected.compliance_report_fields()
+    );
+}
+
+trait ComplianceReportParity {
+    fn compliance_report_fields(&self) -> (String, Vec<String>, Vec<String>, Vec<String>);
+}
+
+impl ComplianceReportParity for contracts::ComplianceReportV1 {
+    fn compliance_report_fields(&self) -> (String, Vec<String>, Vec<String>, Vec<String>) {
+        let mut controls_checked = self.daily_control_attestation.controls_checked.clone();
+        controls_checked.sort();
+        (
+            self.daily_control_attestation.business_date.clone(),
+            self.daily_control_attestation.approved_models.clone(),
+            controls_checked,
+            self.daily_control_attestation.exceptions.clone(),
+        )
+    }
+}
+
 fn build_action() -> AgentActionRequestV1 {
     AgentActionRequestV1 {
-        action_id: "action::quant::promotion".to_string(),
+        action_id: "action::quant::promotion".into(),
         actor_ref: ActorRef("agent.quant_research".to_string()),
         objective: "Promote validated trading strategy".to_string(),
-        requested_workflow: "quant_strategy_promotion".to_string(),
+        requested_workflow: "quant_strategy_promotion".into(),
         impact_tier: ImpactTier::Tier3,
         classification: Classification::Restricted,
         required_approver_roles: vec![
@@ -42,8 +155,8 @@ fn build_request() -> QuantStrategyPromotionRequestV1 {
     }
 }
 
-#[test]
-fn quant_strategy_promotion_matches_fixture_summary_and_gate() {
+#[tokio::test]
+async fn quant_strategy_promotion_matches_fixture_summary_and_gate() {
     let action = build_action();
     let request = build_request();
     let mut approval_service = ApprovalService::default();
@@ -84,6 +197,7 @@ fn quant_strategy_promotion_matches_fixture_summary_and_gate() {
         &action,
         request,
     )
+    .await
     .expect("promotion workflow");
 
     let summary_fixture: PipelineSummary = serde_json::from_str(include_str!(
@@ -94,7 +208,7 @@ fn quant_strategy_promotion_matches_fixture_summary_and_gate() {
         "../../../testing/fixtures/finance/run-2026-03-05/promotion_gate.json"
     ))
     .expect("gate fixture");
-    let compliance_fixture: serde_json::Value = serde_json::from_str(include_str!(
+    let compliance_fixture: contracts::ComplianceReportV1 = serde_json::from_str(include_str!(
         "../../../testing/fixtures/finance/run-2026-03-05/compliance_report.json"
     ))
     .expect("compliance fixture");
@@ -110,31 +224,8 @@ fn quant_strategy_promotion_matches_fixture_summary_and_gate() {
         .recommendation
         .required_workflows
         .contains(&compliance_attestation_boundary().workflow_name));
-    assert_eq!(
-        report
-            .compliance_report
-            .daily_control_attestation
-            .approved_models,
-        compliance_fixture["daily_control_attestation"]["approved_models"]
-            .as_array()
-            .expect("approved models")
-            .iter()
-            .map(|value| value.as_str().expect("approved model").to_string())
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(
-        report
-            .compliance_report
-            .daily_control_attestation
-            .exceptions,
-        compliance_fixture["daily_control_attestation"]["exceptions"]
-            .as_array()
-            .expect("exceptions")
-            .iter()
-            .map(|value| value.as_str().expect("exception").to_string())
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(engine.recorded_evidence().len(), 1);
+    assert_compliance_report_semantics(&report.compliance_report, &compliance_fixture);
+    assert_eq!(engine.recorded_evidence().await.unwrap().len(), 1);
     assert_eq!(governance_service.recommendations().len(), 1);
     assert_eq!(compliance_service.reports().len(), 1);
     assert_eq!(audit_service.audit_events().len(), 2);

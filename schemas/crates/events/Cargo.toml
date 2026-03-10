@@ -10,6 +10,7 @@ chrono.workspace = true
 contracts = { path = "../contracts" }
 identity = { path = "../../../shared/identity" }
 serde.workspace = true
+telemetry = { path = "../../../shared/telemetry" }
 uuid.workspace = true
 
 [lints]

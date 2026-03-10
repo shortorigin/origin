@@ -10,6 +10,7 @@ approval-service = { path = "../../services/approval-service" }
 contracts = { path = "../../schemas/crates/contracts" }
 evidence-sdk = { path = "../../shared/evidence-sdk" }
 finance-service = { path = "../../services/finance-service" }
+identity = { path = "../../shared/identity" }
 orchestrator = { path = "../../platform/runtime/orchestrator" }
 policy-sdk = { path = "../../shared/policy-sdk" }
 policy-service = { path = "../../services/policy-service" }
@@ -19,7 +20,7 @@ error-model = { path = "../../shared/error-model" }
 [dev-dependencies]
 chrono.workspace = true
 evidence-service = { path = "../../services/evidence-service" }
-identity = { path = "../../shared/identity" }
+tokio.workspace = true
 
 [lints]
 workspace = true

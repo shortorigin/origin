@@ -26,8 +26,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use system_shell_contract::{
     CommandDescriptor, CommandNotice, CommandNoticeLevel, CommandResult, CompletionItem,
-    CompletionRequest, DisplayPreference, ExecutionId, ParsedInvocation, ShellError, ShellRequest,
-    ShellStreamEvent, StructuredData,
+    CompletionRequest, DisplayPreference, ExecutionId, ParsedInvocation, SequencedShellStreamEvent,
+    ShellError, ShellRequest, ShellStreamEvent, ShellSubmitError, StructuredData,
 };
 
 /// Stable identifier for a runtime-managed window.
@@ -951,12 +951,12 @@ impl Drop for CommandRegistrationHandle {
 #[derive(Clone)]
 pub struct ShellSessionHandle {
     /// Reactive shell event stream for this session.
-    pub events: ReadSignal<Vec<ShellStreamEvent>>,
+    pub events: ReadSignal<Vec<SequencedShellStreamEvent>>,
     /// Reactive active execution id when one exists.
     pub active_execution: ReadSignal<Option<ExecutionId>>,
     /// Reactive current cwd value.
     pub cwd: ReadSignal<String>,
-    submit: Rc<dyn Fn(ShellRequest)>,
+    submit: Rc<dyn Fn(ShellRequest) -> Result<ExecutionId, ShellSubmitError>>,
     cancel: Rc<dyn Fn()>,
     complete: AppCommandCompletion,
 }
@@ -964,10 +964,10 @@ pub struct ShellSessionHandle {
 impl ShellSessionHandle {
     /// Creates a new shell session handle.
     pub fn new(
-        events: ReadSignal<Vec<ShellStreamEvent>>,
+        events: ReadSignal<Vec<SequencedShellStreamEvent>>,
         active_execution: ReadSignal<Option<ExecutionId>>,
         cwd: ReadSignal<String>,
-        submit: Rc<dyn Fn(ShellRequest)>,
+        submit: Rc<dyn Fn(ShellRequest) -> Result<ExecutionId, ShellSubmitError>>,
         cancel: Rc<dyn Fn()>,
         complete: AppCommandCompletion,
     ) -> Self {
@@ -982,8 +982,8 @@ impl ShellSessionHandle {
     }
 
     /// Submits a shell request to the active session.
-    pub fn submit(&self, request: ShellRequest) {
-        (self.submit)(request);
+    pub fn submit(&self, request: ShellRequest) -> Result<ExecutionId, ShellSubmitError> {
+        (self.submit)(request)
     }
 
     /// Cancels the active foreground execution.

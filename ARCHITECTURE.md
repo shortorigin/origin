@@ -69,6 +69,18 @@ Each top-level module has one primary concern:
 - Rust is the default implementation language for backend, SDK, orchestration, and tooling.
 - Public interfaces originate from `schemas/` and enterprise ontology, not service-local types.
 - Services and workflows communicate through versioned contracts and events.
+- Shared foundational dependency versions are centralized in the root workspace manifest and
+  validated by repository-owned tooling.
+- IO-bearing platform, service, workflow, and storage ports are async-ready; in-memory adapters are
+  limited to tests, local harnesses, or explicitly named simulation modes.
+- Core execution identifiers at runtime boundaries use typed IDs from shared contracts and identity
+  primitives rather than raw strings.
+- Semantic contract parity tests must parse source-of-truth artifacts instead of relying on
+  substring checks.
+- Simulation, heuristic, and synthetic data adapters do not participate in default production
+  service paths unless they are explicitly injected and documented.
+- The shell runtime keeps one foreground execution slot per session and retains only a bounded,
+  sequenced in-memory event log.
 - UI code does not connect directly to SurrealDB or backend private internals.
 - Agents do not mutate infrastructure or production data outside approved workflows.
 - Changes favor additive compatibility over breaking revisions.
