@@ -599,17 +599,17 @@ where
             }
             return Ok(sources);
         }
-        if let Some(capsule_id) = &request.capsule_id {
-            if let Some(capsule) = repositories.load_capsule(capsule_id).await? {
-                let sources = repositories.load_sources(&capsule.source_ids).await?;
-                if sources.len() != capsule.source_ids.len() {
-                    return Err(InstitutionalError::not_found(
-                        knowledge_context("resolve_sources"),
-                        "one or more capsule knowledge sources",
-                    ));
-                }
-                return Ok(sources);
+        if let Some(capsule_id) = &request.capsule_id
+            && let Some(capsule) = repositories.load_capsule(capsule_id).await?
+        {
+            let sources = repositories.load_sources(&capsule.source_ids).await?;
+            if sources.len() != capsule.source_ids.len() {
+                return Err(InstitutionalError::not_found(
+                    knowledge_context("resolve_sources"),
+                    "one or more capsule knowledge sources",
+                ));
             }
+            return Ok(sources);
         }
         Ok(Vec::new())
     }

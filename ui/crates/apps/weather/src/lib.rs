@@ -311,10 +311,10 @@ pub fn WeatherApp(
     let app_state = RwSignal::new(WeatherAppState::default());
     let mapbox_config = RwSignal::new(MapboxConfigState::default());
 
-    if let Some(restored_state) = restored_state {
-        if let Ok(restored) = serde_json::from_value::<WeatherAppState>(restored_state) {
-            app_state.set(restored);
-        }
+    if let Some(restored_state) = restored_state
+        && let Ok(restored) = serde_json::from_value::<WeatherAppState>(restored_state)
+    {
+        app_state.set(restored);
     }
 
     if let Some(section) = launch_params.get("section").and_then(Value::as_str) {
