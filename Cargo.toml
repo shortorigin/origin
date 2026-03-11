@@ -103,6 +103,7 @@ reqwest = { version = "0.12.28", default-features = false, features = ["json", "
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 sha2 = "0.10.9"
+surrealdb = { version = "3.0.3", default-features = false, features = ["kv-mem", "protocol-ws", "rustls"] }
 tempfile = "3.26.0"
 thiserror = "2.0.17"
 toml = "0.8.23"

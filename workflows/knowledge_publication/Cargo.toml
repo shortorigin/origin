@@ -13,7 +13,6 @@ evidence-sdk = { path = "../../shared/evidence-sdk" }
 governed-storage = { path = "../../shared/governed-storage" }
 identity = { path = "../../shared/identity" }
 knowledge-service = { path = "../../services/knowledge-service" }
-memory-provider = { path = "../../platform/runtime/memory-provider" }
 orchestrator = { path = "../../platform/runtime/orchestrator" }
 policy-sdk = { path = "../../shared/policy-sdk" }
 
@@ -22,7 +21,6 @@ approval-service = { path = "../../services/approval-service" }
 chrono = { version = "0.4.42", features = ["clock", "serde"] }
 evidence-service = { path = "../../services/evidence-service" }
 policy-service = { path = "../../services/policy-service" }
-tempfile.workspace = true
 tokio.workspace = true
 trading-core = { path = "../../shared/trading-core" }
 

@@ -25,9 +25,9 @@ pub fn workflow_boundary() -> WorkflowBoundaryV1 {
     }
 }
 
-pub async fn execute<P, A, E, M, R>(
+pub async fn execute<P, A, E, R>(
     engine: &mut WorkflowEngine<P, A, E>,
-    knowledge_service: &KnowledgeService<M>,
+    knowledge_service: &KnowledgeService,
     repositories: &R,
     action: &AgentActionRequestV1,
     ingest_request: KnowledgeSourceIngestRequestV1,
@@ -37,7 +37,6 @@ where
     P: PolicyDecisionPort,
     A: ApprovalVerificationPort,
     E: EvidenceSink,
-    M: memory_provider::KnowledgeMemoryProvider + Clone,
     R: KnowledgeStore,
 {
     let guarded_request = GuardedMutationRequest {
@@ -85,7 +84,6 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use evidence_service::EvidenceService;
     use governed_storage::{connect_in_memory, KnowledgeStore};
-    use memory_provider::MemvidMemoryProvider;
     use orchestrator::WorkflowEngine;
     use policy_service::PolicyService;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -129,9 +127,7 @@ mod tests {
     async fn workflow_executes_ingest_and_publication() {
         let address = spawn_source_server().await;
         let repositories = connect_in_memory().await.expect("repo");
-        let dir = tempfile::tempdir().expect("tempdir");
         let service = knowledge_service::KnowledgeService::new(
-            MemvidMemoryProvider::new(dir.path()),
             Arc::new(FixedClock::new(
                 Utc.with_ymd_and_hms(2026, 3, 9, 12, 0, 0)
                     .single()
