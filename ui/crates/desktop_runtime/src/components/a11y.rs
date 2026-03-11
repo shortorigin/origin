@@ -37,30 +37,32 @@ fn menu_focusable_items(menu_id: &str) -> Vec<web_sys::HtmlElement> {
     let Some(menu) = document.get_element_by_id(menu_id) else {
         return Vec::new();
     };
-    let Ok(nodes) = menu.query_selector_all(
-        r#"[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]"#,
-    ) else {
-        return Vec::new();
-    };
-
     let mut items = Vec::new();
-    for index in 0..nodes.length() {
-        let Some(node) = nodes.item(index) else {
-            continue;
-        };
-        let Ok(item) = node.dyn_into::<web_sys::HtmlElement>() else {
-            continue;
-        };
-        if item.get_attribute("disabled").is_some() {
-            continue;
-        }
-        if item.get_attribute("aria-disabled").as_deref() == Some("true") {
-            continue;
-        }
-        items.push(item);
-    }
+    collect_menu_focusable_items(&menu, &mut items);
 
     items
+}
+
+fn collect_menu_focusable_items(element: &web_sys::Element, items: &mut Vec<web_sys::HtmlElement>) {
+    if matches!(
+        element.get_attribute("role").as_deref(),
+        Some("menuitem" | "menuitemcheckbox" | "menuitemradio")
+    ) {
+        let Ok(item) = element.clone().dyn_into::<web_sys::HtmlElement>() else {
+            return;
+        };
+        if item.get_attribute("disabled").is_none()
+            && item.get_attribute("aria-disabled").as_deref() != Some("true")
+        {
+            items.push(item);
+        }
+    }
+
+    let mut child = element.first_element_child();
+    while let Some(current) = child {
+        child = current.next_element_sibling();
+        collect_menu_focusable_items(&current, items);
+    }
 }
 
 /// Focuses the first enabled menu item inside a menu container.

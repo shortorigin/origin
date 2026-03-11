@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use desktop_app_contract::AppCommandRegistration;
-use leptos::SignalGetUntracked;
+use leptos::prelude::GetUntracked;
 use system_shell_contract::{CommandArgSpec, CommandDataShape, CommandOutputShape};
 
 use crate::{components::DesktopRuntimeContext, model::WindowId, reducer::DesktopAction};

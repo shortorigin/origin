@@ -1,4 +1,6 @@
-use leptos::{create_effect, logging, spawn_local, Callable, Callback};
+use leptos::callback::{Callable, Callback};
+use leptos::prelude::Effect;
+use leptos::{logging, task::spawn_local};
 
 use crate::{
     current_browser_e2e_config,
@@ -40,7 +42,7 @@ pub(super) fn install_boot_hydration(
     dispatch: Callback<DesktopAction>,
     initial_deep_link: Option<DeepLinkState>,
 ) {
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let dispatch = dispatch;
         let boot_host = host.clone();
         let boot_deep_link = initial_deep_link.clone();
@@ -66,7 +68,7 @@ pub(super) fn install_boot_hydration(
             let (snapshot, snapshot_revision) =
                 resolve_authoritative_snapshot(&boot_host, &plan).await;
 
-            dispatch.call(DesktopAction::CompleteBootHydration {
+            dispatch.run(DesktopAction::CompleteBootHydration {
                 snapshot,
                 snapshot_revision,
                 theme: plan.theme,

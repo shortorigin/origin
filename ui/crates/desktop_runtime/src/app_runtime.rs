@@ -3,7 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use desktop_app_contract::{AppEvent, AppLifecycleEvent};
-use leptos::*;
+use leptos::prelude::*;
 use platform_host::unix_time_ms_now;
 
 use crate::model::{WindowId, WindowRecord};
@@ -32,8 +32,8 @@ impl AppRuntimeState {
         }
 
         let session = WindowAppSession {
-            lifecycle: create_rw_signal(AppLifecycleEvent::Mounted),
-            inbox: create_rw_signal(Vec::new()),
+            lifecycle: RwSignal::new(AppLifecycleEvent::Mounted),
+            inbox: RwSignal::new(Vec::new()),
         };
         self.sessions.insert(window_id, session);
         session

@@ -1,6 +1,6 @@
 //! Explicit runtime effect-queue executor for reducer-emitted side effects.
 
-use leptos::*;
+use leptos::prelude::*;
 
 use crate::reducer::RuntimeEffect;
 use crate::runtime_context::DesktopRuntimeContext;
@@ -28,7 +28,7 @@ where
 pub fn install(runtime: DesktopRuntimeContext) {
     // Clear the current queue before processing so nested dispatches enqueue a fresh batch instead
     // of being overwritten by the in-flight drain.
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let queued = runtime.effects.get();
         let Some(batch) = take_effect_batch(queued) else {
             return;

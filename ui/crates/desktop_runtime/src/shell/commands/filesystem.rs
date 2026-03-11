@@ -3,6 +3,7 @@
 use std::rc::Rc;
 
 use desktop_app_contract::AppCommandRegistration;
+use leptos::prelude::GetValue;
 use platform_host::ExplorerEntryKind;
 use system_shell_contract::{
     CommandArgSpec, CommandDataShape, CommandNotice, CommandNoticeLevel, CommandOutputShape,

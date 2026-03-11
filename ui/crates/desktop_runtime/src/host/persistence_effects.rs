@@ -1,4 +1,5 @@
-use leptos::{logging, spawn_local, SignalGetUntracked};
+use leptos::prelude::GetUntracked;
+use leptos::{logging, task::spawn_local};
 use platform_host::{next_monotonic_timestamp_ms, save_pref_with};
 use platform_host_web::{publish_shell_sync_event, ShellSyncEvent, ShellSyncKind};
 

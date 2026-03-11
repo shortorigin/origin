@@ -9,5 +9,5 @@ pub fn focus_or_unminimize_window(
     desktop: &DesktopState,
     window_id: WindowId,
 ) {
-    components::focus_or_unminimize_window(runtime, desktop, window_id);
+    components::focus_or_unminimize_window(&runtime, desktop, window_id);
 }

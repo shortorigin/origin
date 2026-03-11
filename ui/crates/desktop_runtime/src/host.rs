@@ -12,7 +12,8 @@ mod persistence_effects;
 
 use std::rc::Rc;
 
-use leptos::{logging, spawn_local, Callback};
+use leptos::callback::Callback;
+use leptos::{logging, task::spawn_local};
 use platform_host::{
     AppStateStore, ContentCache, ExplorerFsService, ExternalUrlService, HostCapabilities,
     HostServices, NotificationService, PrefsStore, TerminalProcessService,

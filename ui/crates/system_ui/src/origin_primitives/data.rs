@@ -1,6 +1,8 @@
+use leptos::callback::Callable;
 use leptos::ev::{KeyboardEvent, MouseEvent};
 use leptos::html;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::web_sys;
 
 use crate::foundation::{
     merge_layout_class, ButtonVariant, Elevation, LayoutAlign, LayoutGap, LayoutJustify,
@@ -146,7 +148,7 @@ pub fn ListSurface(
     #[prop(default = Elevation::Raised)] elevation: Elevation,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] role: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     children: Children,
 ) -> impl IntoView {
     view! {
@@ -170,8 +172,8 @@ pub fn DataTable(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] role: Option<String>,
     #[prop(optional, into)] aria_label: Option<String>,
-    #[prop(optional, into)] tabindex: MaybeSignal<i32>,
-    #[prop(optional, into)] aria_activedescendant: MaybeSignal<String>,
+    #[prop(optional, into)] tabindex: Signal<i32>,
+    #[prop(optional, into)] aria_activedescendant: Signal<String>,
     #[prop(optional)] on_keydown: Option<Callback<KeyboardEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -187,7 +189,7 @@ pub fn DataTable(
             aria-activedescendant=move || aria_activedescendant.get()
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
         >
@@ -209,7 +211,7 @@ pub fn CompletionItem(
             variant=ButtonVariant::Quiet
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -223,7 +225,7 @@ pub fn CompletionList(
     #[prop(default = Elevation::Transient)] elevation: Elevation,
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] role: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     children: Children,
 ) -> impl IntoView {
     view! {
@@ -265,7 +267,7 @@ pub fn TerminalSurface(
             aria-live=aria_live
             on:scroll=move |ev| {
                 if let Some(on_scroll) = on_scroll.as_ref() {
-                    on_scroll.call(ev);
+                    on_scroll.run(ev);
                 }
             }
         >
@@ -278,7 +280,7 @@ pub fn TerminalSurface(
 pub fn TerminalTranscript(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] role: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     children: Children,
 ) -> impl IntoView {
     view! {
