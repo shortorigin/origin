@@ -14,6 +14,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256, Sha384};
 
+use crate::common::stamp_ui_asset_generation;
+
 const BUILD_ROOT: &str = "build/wasm-hardening";
 const CARGO_TARGET_DIR_NAME: &str = "cargo-target";
 const BUILD_A_NAME: &str = "build-a";
@@ -67,6 +69,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         .map_err(|error| format!("failed to create `{}`: {error}", base_dir.display()))?;
 
     let report = verify(&workspace_root, &base_dir)?;
+    let hardened = report.contains("- pipeline status: HARDENED");
     fs::write(&output_path, &report).map_err(|error| {
         format!(
             "failed to write report `{}`: {error}",
@@ -74,7 +77,14 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         )
     })?;
     println!("{report}");
-    Ok(())
+    if hardened {
+        Ok(())
+    } else {
+        Err(format!(
+            "UI hardening verification failed; see `{}`",
+            output_path.display()
+        ))
+    }
 }
 
 fn parse_output_path(workspace_root: &Path, args: &[String]) -> PathBuf {
@@ -689,15 +699,11 @@ fn build_findings(
     let mut findings = Vec::new();
 
     if !config_audit.workflows.iter().all(|(_path, contents)| {
-        contents.contains("dtolnay/rust-toolchain@1.91.1")
-            || (contents.contains("uses: ./.github/actions/setup-build-environment")
-                && config_audit
-                    .setup_build_environment_action
-                    .contains("dtolnay/rust-toolchain@1.91.1"))
+        workflow_uses_pinned_rust_toolchain(contents, &config_audit.setup_build_environment_action)
     }) {
         findings.push(Finding::fail(
             "CI still uses a floating Rust toolchain",
-            "Expected all Rust-installing workflows to pin `dtolnay/rust-toolchain@1.91.1`.",
+            "Expected all Rust-installing workflows to pin the Rust toolchain directly or to use the repo-owned setup action that resolves the pinned channel from `rust-toolchain.toml`.",
             "floating toolchain selection can alter browser artifacts across environments",
         ));
     }
@@ -822,6 +828,21 @@ fn build_findings(
     }
 
     findings
+}
+
+fn workflow_uses_pinned_rust_toolchain(
+    workflow_contents: &str,
+    setup_action_contents: &str,
+) -> bool {
+    workflow_contents.contains("dtolnay/rust-toolchain@1.91.1")
+        || (workflow_contents.contains("uses: ./.github/actions/setup-build-environment")
+            && setup_action_uses_pinned_rust_toolchain(setup_action_contents))
+}
+
+fn setup_action_uses_pinned_rust_toolchain(contents: &str) -> bool {
+    contents.contains("rustup toolchain install")
+        && contents.contains("rust-toolchain.toml")
+        && contents.contains("rustup component add")
 }
 
 fn build_actions(findings: &[Finding]) -> Vec<Action> {
@@ -1394,6 +1415,7 @@ fn run_logged_command(
 
 fn command<const N: usize>(program: &str, args: [&str; N]) -> Command {
     let mut command = Command::new(program);
+    stamp_ui_asset_generation(&mut command);
     command.args(args);
     command
 }
