@@ -46,11 +46,13 @@ mod tests {
         let rows = weather_factor_rows(&snapshot.feature_slices);
 
         assert_eq!(rows.len(), 4);
-        assert!(rows.iter().any(|row| row
-            .raw_artifact_hashes
-            .contains(&"sha-hrrr-001".to_string())));
-        assert!(rows
-            .iter()
-            .any(|row| row.feature_name.contains("WindSpeed10m")));
+        assert!(rows.iter().any(|row| {
+            row.raw_artifact_hashes
+                .contains(&"sha-hrrr-001".to_string())
+        }));
+        assert!(
+            rows.iter()
+                .any(|row| row.feature_name.contains("WindSpeed10m"))
+        );
     }
 }

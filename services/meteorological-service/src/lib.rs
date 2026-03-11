@@ -11,7 +11,7 @@ use contracts::{
 use error_model::{InstitutionalError, InstitutionalResult, OperationContext};
 use events::{WeatherAlertUpdatedV1, WeatherProductPublishedV1};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const SERVICE_NAME: &str = "meteorological-service";
 const DOMAIN_NAME: &str = "meteorological_intelligence";
@@ -1249,10 +1249,10 @@ mod tests {
     use contract_parity::assert_service_boundary_matches_catalog;
 
     use super::{
+        DOMAIN_NAME, MeteorologicalService, WeatherFixtureBatchV1, WeatherMapHttpAdapter,
+        WeatherMapSourceRequestV1, WeatherMapTilePayloadFormatV1, WeatherMapTileRequestV1,
         immutable_asset_cache_control, scene_manifest_cache_control, service_boundary,
-        weather_map_scene_path, MeteorologicalService, WeatherFixtureBatchV1,
-        WeatherMapHttpAdapter, WeatherMapSourceRequestV1, WeatherMapTilePayloadFormatV1,
-        WeatherMapTileRequestV1, DOMAIN_NAME,
+        weather_map_scene_path,
     };
 
     fn load_fixture() -> WeatherFixtureBatchV1 {
@@ -1301,10 +1301,12 @@ mod tests {
         assert_eq!(scene.layers.len(), 7);
         assert_eq!(scene.frames.len(), 4);
         assert!(scene.sources.iter().any(|source| source.cluster));
-        assert!(scene
-            .frames
-            .iter()
-            .all(|frame| !frame.source_bindings.is_empty()));
+        assert!(
+            scene
+                .frames
+                .iter()
+                .all(|frame| !frame.source_bindings.is_empty())
+        );
     }
 
     #[test]

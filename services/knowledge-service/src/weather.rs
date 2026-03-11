@@ -65,11 +65,15 @@ mod tests {
         let entries = weather_feature_register_entries(&load_slices());
 
         assert_eq!(entries.len(), 4);
-        assert!(entries
-            .iter()
-            .any(|entry| entry.quality_flag.contains("Estimated")));
-        assert!(entries
-            .iter()
-            .any(|entry| entry.notes.contains("sha-hrrr-001")));
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.quality_flag.contains("Estimated"))
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.notes.contains("sha-hrrr-001"))
+        );
     }
 }

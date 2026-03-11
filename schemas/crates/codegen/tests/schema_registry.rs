@@ -10,49 +10,79 @@ fn schema_registry_embeds_contract_event_and_record_documents() {
     assert_eq!(event_schemas.len(), 15);
     assert_eq!(surrealdb_schemas.len(), 3);
 
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "task-contract-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "work-item-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "validation-report-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "macro-financial-analysis-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-retrieval-query-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-retrieval-hit-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-change-notification-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "decision-context-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "decision-audit-record-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "weather-view-v1"));
-    assert!(contract_schemas
-        .iter()
-        .any(|schema| schema.name == "weather-map-scene-v1"));
-    assert!(event_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-analysis-generated-v1"));
-    assert!(event_schemas
-        .iter()
-        .any(|schema| schema.name == "weather-product-published-v1"));
-    assert!(surrealdb_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-data-plane-v1"));
-    assert!(surrealdb_schemas
-        .iter()
-        .any(|schema| schema.name == "knowledge-projections-v1"));
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "task-contract-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "work-item-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "validation-report-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "macro-financial-analysis-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-retrieval-query-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-retrieval-hit-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-change-notification-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "decision-context-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "decision-audit-record-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "weather-view-v1")
+    );
+    assert!(
+        contract_schemas
+            .iter()
+            .any(|schema| schema.name == "weather-map-scene-v1")
+    );
+    assert!(
+        event_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-analysis-generated-v1")
+    );
+    assert!(
+        event_schemas
+            .iter()
+            .any(|schema| schema.name == "weather-product-published-v1")
+    );
+    assert!(
+        surrealdb_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-data-plane-v1")
+    );
+    assert!(
+        surrealdb_schemas
+            .iter()
+            .any(|schema| schema.name == "knowledge-projections-v1")
+    );
 }
