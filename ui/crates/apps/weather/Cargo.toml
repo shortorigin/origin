@@ -12,12 +12,12 @@ csr = ["leptos/csr", "desktop_app_contract/csr"]
 [dependencies]
 contracts = { path = "../../../../schemas/crates/contracts" }
 desktop_app_contract = { path = "../../desktop_app_contract", default-features = false }
-leptos = { version = "0.6", default-features = false }
+leptos = { workspace = true, default-features = false }
 sdk-rs = { path = "../../../../platform/sdk/sdk-rs" }
 serde.workspace = true
 serde_json.workspace = true
 system_ui = { path = "../../system_ui", default-features = false }
-wasm-bindgen = "0.2"
+wasm-bindgen.workspace = true
 
 [dev-dependencies]
 chrono.workspace = true

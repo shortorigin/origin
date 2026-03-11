@@ -456,7 +456,7 @@ fn mount_settings_app(context: AppMountContext) -> AnyView {
     .into_any()
 }
 
-fn mount_weather_app(context: AppMountContext) -> View {
+fn mount_weather_app(context: AppMountContext) -> AnyView {
     view! {
         <WeatherApp
             launch_params=context.launch_params.clone()
@@ -465,6 +465,7 @@ fn mount_weather_app(context: AppMountContext) -> View {
         />
     }
     .into_view()
+    .into_any()
 }
 
 #[cfg(test)]

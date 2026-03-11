@@ -6,10 +6,8 @@ mod mapbox;
 
 use contracts::{WeatherMapLayerV1, WeatherMapSceneV1};
 use desktop_app_contract::AppServices;
-use leptos::{
-    component, create_effect, create_rw_signal, view, Callback, CollectView, For, IntoView,
-    ReadSignal, RwSignal, Show, Signal, SignalGet, SignalSet, SignalUpdate,
-};
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use sdk_rs::WeatherPlatformSnapshotV1;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -310,8 +308,8 @@ pub fn WeatherApp(
     services: Option<AppServices>,
 ) -> impl IntoView {
     let services = services.expect("weather app requires app services");
-    let app_state = create_rw_signal(WeatherAppState::default());
-    let mapbox_config = create_rw_signal(MapboxConfigState::default());
+    let app_state = RwSignal::new(WeatherAppState::default());
+    let mapbox_config = RwSignal::new(MapboxConfigState::default());
 
     if let Some(restored_state) = restored_state {
         if let Ok(restored) = serde_json::from_value::<WeatherAppState>(restored_state) {
@@ -335,7 +333,7 @@ pub fn WeatherApp(
     {
         let config_service = services.config.clone();
         let config_state = mapbox_config;
-        leptos::spawn_local(async move {
+        spawn_local(async move {
             let token = config_service
                 .load::<String>("maps", "mapbox_public_token")
                 .await;
@@ -361,7 +359,7 @@ pub fn WeatherApp(
     }
 
     let state_service = services.state.clone();
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Ok(serialized) = serde_json::to_value(app_state.get()) {
             state_service.persist_window_state(serialized);
         }
@@ -372,7 +370,7 @@ pub fn WeatherApp(
         move || services.platform.weather.get()
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let Some(scene) = weather_snapshot.get().map_scene else {
             return;
         };
@@ -619,7 +617,7 @@ fn WeatherMapViewport(
 ) -> impl IntoView {
     let container_id = Signal::derive(move || map_container_id(scene.get().as_ref()));
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let Some(scene) = scene.get() else {
             return;
         };
@@ -727,8 +725,8 @@ mod tests {
     use sdk_rs::WeatherPlatformSnapshotV1;
 
     use super::{
-        active_frame_id, alert_headlines, feature_rows, frame_labels, layer_rows, map_status,
-        snapshot_summary, MapboxConfigState, WeatherAppState,
+        MapboxConfigState, WeatherAppState, active_frame_id, alert_headlines, feature_rows,
+        frame_labels, layer_rows, map_status, snapshot_summary,
     };
 
     fn load_snapshot() -> WeatherPlatformSnapshotV1 {
@@ -822,9 +820,10 @@ mod tests {
     fn feature_rows_flatten_weather_feature_products() {
         let rows = feature_rows(&load_snapshot());
         assert_eq!(rows.len(), 4);
-        assert!(rows
-            .iter()
-            .any(|row| row.label.contains("PrecipitationRate")));
+        assert!(
+            rows.iter()
+                .any(|row| row.label.contains("PrecipitationRate"))
+        );
     }
 
     #[test]
@@ -889,10 +888,12 @@ mod tests {
                     .as_deref()
                     .is_some_and(|url| url.contains("features.geojson"))
         }));
-        assert!(!plan
-            .layers
-            .iter()
-            .any(|layer| layer.layer_id == "selection-overlay"));
+        assert!(
+            !plan
+                .layers
+                .iter()
+                .any(|layer| layer.layer_id == "selection-overlay")
+        );
     }
 
     #[test]
