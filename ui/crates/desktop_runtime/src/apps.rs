@@ -2,7 +2,7 @@
 
 use std::sync::OnceLock;
 
-use crate::model::{DesktopState, OpenWindowRequest, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH};
+use crate::model::{DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, DesktopState, OpenWindowRequest};
 use desktop_app_contract::{
     AppCapability, AppModule, AppMountContext, AppRegistration, ApplicationId,
     PluginLauncherRegistration, PluginUiRegistration, PluginWindowDefaults, SuspendPolicy,
@@ -10,7 +10,8 @@ use desktop_app_contract::{
 use desktop_app_control_center::ControlCenterApp;
 use desktop_app_settings::SettingsApp;
 use desktop_app_terminal::TerminalApp;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::tachys::view::any_view::{AnyView, IntoAny};
 use system_ui::primitives::IconName;
 
 const APP_ID_CONTROL_CENTER: &str = "system.control-center";
@@ -399,7 +400,7 @@ fn default_window_rect_for_app(
     crate::model::WindowRect { x, y, w, h }
 }
 
-fn mount_control_center_app(context: AppMountContext) -> View {
+fn mount_control_center_app(context: AppMountContext) -> AnyView {
     view! {
         <ControlCenterApp
             launch_params=context.launch_params.clone()
@@ -408,9 +409,10 @@ fn mount_control_center_app(context: AppMountContext) -> View {
         />
     }
     .into_view()
+    .into_any()
 }
 
-fn mount_terminal_app(context: AppMountContext) -> View {
+fn mount_terminal_app(context: AppMountContext) -> AnyView {
     view! {
         <TerminalApp
             window_id=context.window_id
@@ -420,9 +422,10 @@ fn mount_terminal_app(context: AppMountContext) -> View {
         />
     }
     .into_view()
+    .into_any()
 }
 
-fn mount_settings_app(context: AppMountContext) -> View {
+fn mount_settings_app(context: AppMountContext) -> AnyView {
     view! {
         <SettingsApp
             launch_params=context.launch_params.clone()
@@ -431,6 +434,7 @@ fn mount_settings_app(context: AppMountContext) -> View {
         />
     }
     .into_view()
+    .into_any()
 }
 
 #[cfg(test)]
@@ -549,13 +553,17 @@ mod tests {
         assert_eq!(control_center.platform_contract_version, "1.0.0");
         assert_eq!(control_center.runtime_contract_version, "2.0.0");
         assert_eq!(control_center.ui.entry, "desktop_app_control_center");
-        assert!(control_center
-            .ui
-            .routes
-            .contains(&"/apps/control-center".to_string()));
-        assert!(control_center
-            .required_platform_contracts
-            .contains(&"schemas/contracts/v1/plugin-module-v1.json".to_string()));
+        assert!(
+            control_center
+                .ui
+                .routes
+                .contains(&"/apps/control-center".to_string())
+        );
+        assert!(
+            control_center
+                .required_platform_contracts
+                .contains(&"schemas/contracts/v1/plugin-module-v1.json".to_string())
+        );
         assert_eq!(control_center.runtime_targets, vec!["pwa", "tauri"]);
         assert!(control_center.launcher.show_in_launcher);
         assert!(control_center.launcher.show_on_desktop);

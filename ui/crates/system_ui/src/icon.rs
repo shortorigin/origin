@@ -1,6 +1,6 @@
 //! Centralized icon catalog and renderer for the shared UI primitive library.
 
-use leptos::*;
+use leptos::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// Semantic icon identifiers used by shell and app primitives.

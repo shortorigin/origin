@@ -6,7 +6,7 @@
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
 use desktop_app_contract::AppServices;
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use system_ui::components::{AppShell, StatusBar, StatusBarItem, ToggleRow, Toolbar};
@@ -64,12 +64,12 @@ pub fn SettingsApp(
     services: Option<AppServices>,
 ) -> impl IntoView {
     let services = services.expect("settings requires app services");
-    let settings_state = create_rw_signal(SettingsAppState::default());
+    let settings_state = RwSignal::new(SettingsAppState::default());
 
-    if let Some(restored_state) = restored_state {
-        if let Ok(restored) = serde_json::from_value::<SettingsAppState>(restored_state) {
-            settings_state.set(restored);
-        }
+    if let Some(restored_state) = restored_state
+        && let Ok(restored) = serde_json::from_value::<SettingsAppState>(restored_state)
+    {
+        settings_state.set(restored);
     }
 
     if let Some(section) = launch_params
@@ -81,7 +81,7 @@ pub fn SettingsApp(
     }
 
     let state_service = services.state.clone();
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Ok(serialized) = serde_json::to_value(settings_state.get()) {
             state_service.persist_window_state(serialized);
         }

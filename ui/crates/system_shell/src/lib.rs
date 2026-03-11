@@ -14,7 +14,8 @@ use std::{
 };
 
 use futures::future::LocalBoxFuture;
-use leptos::{create_rw_signal, ReadSignal, RwSignal, SignalGetUntracked, SignalSet, SignalUpdate};
+use leptos::prelude::{GetUntracked, ReadSignal, RwSignal, Set, Update};
+use leptos::task::spawn_local;
 use system_shell_contract::{
     CommandDataShape, CommandDescriptor, CommandInputShape, CommandNotice, CommandNoticeLevel,
     CommandPath, CommandRegistrationToken, CommandResult, CommandScope, CommandVisibility,
@@ -328,7 +329,7 @@ impl ShellSessionHandle {
         self.state.active_execution.set(Some(execution_id));
         let state = self.state.clone();
         let registry = self.registry.clone();
-        leptos::spawn_local(async move {
+        spawn_local(async move {
             let emitter = EventEmitter {
                 events: state.events,
                 next_sequence: state.next_event_sequence.clone(),
@@ -525,12 +526,10 @@ impl RegistrySnapshot {
             registered,
             matched_len,
         }) = self.resolve_stage(&base_tokens)
+            && base_tokens.len() >= matched_len
+            && let Some(completion) = registered.completion
         {
-            if base_tokens.len() >= matched_len {
-                if let Some(completion) = registered.completion {
-                    return completion(request).await;
-                }
-            }
+            return completion(request).await;
         }
 
         let mut items = Vec::new();
@@ -921,30 +920,29 @@ fn parse_invocation_arguments(
 
     while index < tokens.len() {
         let token = &tokens[index];
-        if let Some(rest) = token.strip_prefix("--") {
-            if !rest.is_empty() {
-                if let Some((name, raw_value)) = rest.split_once('=') {
-                    options.push(ParsedOption {
-                        name: name.to_string(),
-                        short: None,
-                        value: Some(parse_value(raw_value)),
-                    });
-                } else {
-                    let takes_value =
-                        index + 1 < tokens.len() && !tokens[index + 1].starts_with('-');
-                    let value = takes_value.then(|| {
-                        index += 1;
-                        parse_value(&tokens[index])
-                    });
-                    options.push(ParsedOption {
-                        name: rest.to_string(),
-                        short: None,
-                        value,
-                    });
-                }
-                index += 1;
-                continue;
+        if let Some(rest) = token.strip_prefix("--")
+            && !rest.is_empty()
+        {
+            if let Some((name, raw_value)) = rest.split_once('=') {
+                options.push(ParsedOption {
+                    name: name.to_string(),
+                    short: None,
+                    value: Some(parse_value(raw_value)),
+                });
+            } else {
+                let takes_value = index + 1 < tokens.len() && !tokens[index + 1].starts_with('-');
+                let value = takes_value.then(|| {
+                    index += 1;
+                    parse_value(&tokens[index])
+                });
+                options.push(ParsedOption {
+                    name: rest.to_string(),
+                    short: None,
+                    value,
+                });
             }
+            index += 1;
+            continue;
         }
 
         if token.starts_with('-') && token.len() > 1 {
@@ -1067,9 +1065,9 @@ impl ShellEngine {
     pub fn new_session(&self, cwd: impl Into<String>) -> ShellSessionHandle {
         let cwd = cwd.into();
         let state = SessionState {
-            cwd: create_rw_signal(cwd),
-            events: create_rw_signal(Vec::new()),
-            active_execution: create_rw_signal(None),
+            cwd: RwSignal::new(cwd),
+            events: RwSignal::new(Vec::new()),
+            active_execution: RwSignal::new(None),
             next_execution_id: Rc::new(Cell::new(0)),
             next_event_sequence: Rc::new(Cell::new(0)),
             cancel_flag: Rc::new(Cell::new(false)),
@@ -1084,6 +1082,7 @@ impl ShellEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use leptos::prelude::{GetUntracked, Owner, Set};
     use system_shell_contract::{
         CommandArgSpec, CommandExample, CommandId, CommandInteractionKind, CommandOptionSpec,
         CommandOutputShape, HelpDoc,
@@ -1129,7 +1128,8 @@ mod tests {
 
     #[test]
     fn registration_handle_unregisters() {
-        let _ = leptos::create_runtime();
+        let owner = Owner::new();
+        owner.set();
         let engine = ShellEngine::new();
         let handle = engine.register_command(
             descriptor("apps list", &[], CommandScope::Global),
@@ -1139,6 +1139,7 @@ mod tests {
         assert_eq!(engine.registry.visible_commands().len(), 1);
         handle.unregister();
         assert_eq!(engine.registry.visible_commands().len(), 0);
+        owner.cleanup();
     }
 
     #[test]
@@ -1151,7 +1152,8 @@ mod tests {
 
     #[test]
     fn submit_rejects_when_busy_without_emitting_placeholder_events() {
-        let _ = leptos::create_runtime();
+        let owner = Owner::new();
+        owner.set();
         let engine = ShellEngine::new();
         let session = engine.new_session("~/desktop");
         session.state.active_execution.set(Some(ExecutionId(7)));
@@ -1171,11 +1173,13 @@ mod tests {
             }
         );
         assert!(session.events().get_untracked().is_empty());
+        owner.cleanup();
     }
 
     #[test]
     fn event_log_is_bounded_and_monotonic() {
-        let _ = leptos::create_runtime();
+        let owner = Owner::new();
+        owner.set();
         let engine = ShellEngine::new();
         let session = engine.new_session("~/desktop");
         let emitter = EventEmitter {
@@ -1210,8 +1214,11 @@ mod tests {
             }),
             Some("event-263")
         );
-        assert!(events
-            .windows(2)
-            .all(|window| window[0].sequence + 1 == window[1].sequence));
+        assert!(
+            events
+                .windows(2)
+                .all(|window| window[0].sequence + 1 == window[1].sequence)
+        );
+        owner.cleanup();
     }
 }

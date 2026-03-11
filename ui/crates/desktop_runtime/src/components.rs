@@ -9,8 +9,9 @@ mod window;
 use std::time::Duration;
 
 use desktop_app_contract::ApplicationId;
-use leptos::*;
-use serde_json::{json, Value};
+use leptos::ev;
+use leptos::prelude::*;
+use serde_json::{Value, json};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue};
 
@@ -55,7 +56,7 @@ fn taskbar_window_button_dom_id(window_id: WindowId) -> String {
     format!("taskbar-window-button-{}", window_id.0)
 }
 
-pub use crate::runtime_context::{use_desktop_runtime, DesktopProvider, DesktopRuntimeContext};
+pub use crate::runtime_context::{DesktopProvider, DesktopRuntimeContext, use_desktop_runtime};
 
 fn browser_e2e_window_request(
     app_id: ApplicationId,
@@ -140,17 +141,17 @@ pub fn DesktopShell() -> impl IntoView {
     let runtime = use_desktop_runtime();
     let state = runtime.state;
     let browser_e2e = use_context::<BrowserE2eConfig>();
-    let desktop_context_menu = create_rw_signal(None::<DesktopContextMenuState>);
-    let desktop_context_menu_was_open = create_rw_signal(false);
-    let browser_e2e_scene_applied = create_rw_signal(false);
-    let browser_e2e_ready = create_rw_signal(browser_e2e.is_none());
-    let browser_e2e_marked_ready = create_rw_signal(false);
+    let desktop_context_menu = RwSignal::new(None::<DesktopContextMenuState>);
+    let desktop_context_menu_was_open = RwSignal::new(false);
+    let browser_e2e_scene_applied = RwSignal::new(false);
+    let browser_e2e_ready = RwSignal::new(browser_e2e.is_none());
+    let browser_e2e_marked_ready = RwSignal::new(false);
     let browser_e2e_for_scene_setup = browser_e2e.clone();
     let browser_e2e_for_readiness = browser_e2e.clone();
     let browser_e2e_for_scene_attr = browser_e2e.clone();
     let browser_e2e_for_ready_attr = browser_e2e.clone();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let is_open = desktop_context_menu.get().is_some();
         let was_open = desktop_context_menu_was_open.get_untracked();
         if is_open && !was_open {
@@ -186,16 +187,16 @@ pub fn DesktopShell() -> impl IntoView {
             runtime.dispatch_action(DesktopAction::UpdateResize { pointer });
         }
     };
-    let on_pointer_end = move |_| end_active_pointer_interaction(runtime);
+    let on_pointer_end = move |_| end_active_pointer_interaction(&runtime);
     let open_system_settings = Callback::new(move |_| {
         desktop_context_menu.set(None);
         runtime.dispatch_action(DesktopAction::CloseStartMenu);
         runtime.dispatch_action(DesktopAction::CloseControlCenter);
         runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
-        open_system_settings(runtime, TASKBAR_HEIGHT_PX);
+        open_system_settings(&runtime, TASKBAR_HEIGHT_PX);
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let Some(config) = browser_e2e_for_scene_setup.clone() else {
             return;
         };
@@ -270,7 +271,7 @@ pub fn DesktopShell() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let Some(config) = browser_e2e_for_readiness.clone() else {
             return;
         };
@@ -316,7 +317,7 @@ pub fn DesktopShell() -> impl IntoView {
         browser_e2e_ready.set(ready);
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if browser_e2e_ready.get() && !browser_e2e_marked_ready.get() {
             browser_e2e_marked_ready.set(true);
             mark_browser_e2e_ready();
@@ -613,15 +614,15 @@ fn build_taskbar_shortcut_targets(state: &DesktopState) -> Vec<TaskbarShortcutTa
     targets
 }
 
-fn activate_pinned_taskbar_app(runtime: DesktopRuntimeContext, app_id: ApplicationId) {
+fn activate_pinned_taskbar_app(runtime: &DesktopRuntimeContext, app_id: ApplicationId) {
     let state = runtime.state.get_untracked();
     let descriptor = apps::app_descriptor_by_id(&app_id);
 
-    if descriptor.single_instance {
-        if let Some(window_id) = preferred_window_for_app(&state, &app_id) {
-            focus_or_unminimize_window(runtime, &state, window_id);
-            return;
-        }
+    if descriptor.single_instance
+        && let Some(window_id) = preferred_window_for_app(&state, &app_id)
+    {
+        focus_or_unminimize_window(runtime, &state, window_id);
+        return;
     }
 
     runtime.dispatch_action(DesktopAction::ActivateApp {
@@ -635,7 +636,10 @@ fn activate_pinned_taskbar_app(runtime: DesktopRuntimeContext, app_id: Applicati
     });
 }
 
-fn activate_taskbar_shortcut_target(runtime: DesktopRuntimeContext, target: TaskbarShortcutTarget) {
+fn activate_taskbar_shortcut_target(
+    runtime: &DesktopRuntimeContext,
+    target: TaskbarShortcutTarget,
+) {
     match target {
         TaskbarShortcutTarget::Pinned(app_id) => activate_pinned_taskbar_app(runtime, app_id),
         TaskbarShortcutTarget::Window(window_id) => {
@@ -646,7 +650,7 @@ fn activate_taskbar_shortcut_target(runtime: DesktopRuntimeContext, target: Task
 }
 
 pub(crate) fn focus_or_unminimize_window(
-    runtime: DesktopRuntimeContext,
+    runtime: &DesktopRuntimeContext,
     state: &DesktopState,
     window_id: WindowId,
 ) {
@@ -744,7 +748,7 @@ fn pointer_from_pointer_event(ev: &web_sys::PointerEvent) -> PointerPosition {
     }
 }
 
-fn end_active_pointer_interaction(runtime: DesktopRuntimeContext) {
+fn end_active_pointer_interaction(runtime: &DesktopRuntimeContext) {
     let interaction = runtime.interaction.get_untracked();
     if interaction.dragging.is_some() {
         runtime.dispatch_action(DesktopAction::EndMoveWithViewport {

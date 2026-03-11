@@ -11,11 +11,11 @@ use desktop_app_contract::{
     CommandRegistrationHandle as AppCommandRegistrationHandle, CommandService, ShellSessionHandle,
 };
 use futures::future::LocalBoxFuture;
-use leptos::SignalGetUntracked;
+use leptos::prelude::{GetUntracked, GetValue, ReadSignal, WithValue};
 use nu_ansi_term::{Color, Style};
 use nu_protocol::{Config as NuConfig, Record as NuRecord, Span as NuSpan, Value as NuValue};
 use nu_table::{NuTable, TableTheme, TextStyle};
-use platform_host::{normalize_virtual_path, ExplorerEntry, ExplorerEntryKind};
+use platform_host::{ExplorerEntry, ExplorerEntryKind, normalize_virtual_path};
 use serde_json::Value;
 use system_shell::{CommandExecutionContext, CommandRegistryHandle};
 use system_shell_contract::{
@@ -40,15 +40,15 @@ pub fn build_command_service(
     runtime: DesktopRuntimeContext,
     app_id: ApplicationId,
     window_id: WindowId,
-    history: leptos::ReadSignal<Vec<String>>,
+    history: ReadSignal<Vec<String>>,
 ) -> CommandService {
     CommandService::new(
         history,
         Rc::new({
             let runtime = runtime.clone();
             move |cwd| {
-                let session = leptos::with_owner(runtime.owner, || {
-                    runtime.shell_engine.get_value().new_session(cwd)
+                let session = runtime.owner.with_value(|owner| {
+                    owner.with(|| runtime.shell_engine.get_value().new_session(cwd))
                 });
                 let submit_session = session.clone();
                 let cancel_session = session.clone();

@@ -6,6 +6,8 @@ use crate::apps;
 use crate::shell;
 use desktop_app_contract::{AppMountContext, AppServices, ApplicationId, CapabilitySet};
 use leptos::ev::MouseEvent;
+use leptos::prelude::GetValue;
+use leptos::task::spawn_local;
 use sdk_rs::{InstitutionalPlatformClientV1, ReleasedUiAppV1};
 use system_ui::components::{
     WindowControls as SystemWindowControls, WindowFrame as SystemWindowFrame,
@@ -91,19 +93,19 @@ pub(super) fn DesktopWindow(window_id: WindowId) -> impl IntoView {
     let titlebar_double_click = move |ev: web_sys::MouseEvent| {
         ev.prevent_default();
         ev.stop_propagation();
-        if let Some(win) = window.get() {
-            if win.flags.maximizable {
-                if win.maximized {
-                    runtime.dispatch_action(DesktopAction::RestoreWindow { window_id });
-                } else {
-                    runtime.dispatch_action(DesktopAction::MaximizeWindow {
-                        window_id,
-                        viewport: runtime
-                            .host
-                            .get_value()
-                            .desktop_viewport_rect(TASKBAR_HEIGHT_PX),
-                    });
-                }
+        if let Some(win) = window.get()
+            && win.flags.maximizable
+        {
+            if win.maximized {
+                runtime.dispatch_action(DesktopAction::RestoreWindow { window_id });
+            } else {
+                runtime.dispatch_action(DesktopAction::MaximizeWindow {
+                    window_id,
+                    viewport: runtime
+                        .host
+                        .get_value()
+                        .desktop_viewport_rect(TASKBAR_HEIGHT_PX),
+                });
             }
         }
     };
@@ -315,15 +317,15 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
     let session = ensure_window_session(runtime.app_runtime, window_id);
     let lifecycle = session.lifecycle.read_only();
     let inbox = session.inbox;
-    let theme_dark_mode = create_rw_signal(matches!(
+    let theme_dark_mode = RwSignal::new(matches!(
         runtime.state.get_untracked().theme.mode,
         crate::model::ThemeMode::Dark
     ));
-    let theme_high_contrast = create_rw_signal(runtime.state.get_untracked().theme.high_contrast);
-    let theme_reduced_motion = create_rw_signal(runtime.state.get_untracked().theme.reduced_motion);
-    let terminal_history = create_rw_signal(runtime.state.get_untracked().terminal_history);
-    let shared_state = create_rw_signal(runtime.state.get_untracked().app_shared_state);
-    create_effect(move |_| {
+    let theme_high_contrast = RwSignal::new(runtime.state.get_untracked().theme.high_contrast);
+    let theme_reduced_motion = RwSignal::new(runtime.state.get_untracked().theme.reduced_motion);
+    let terminal_history = RwSignal::new(runtime.state.get_untracked().terminal_history);
+    let shared_state = RwSignal::new(runtime.state.get_untracked().app_shared_state);
+    Effect::new(move |_| {
         let desktop = runtime.state.get();
         theme_dark_mode.set(matches!(desktop.theme.mode, crate::model::ThemeMode::Dark));
         theme_high_contrast.set(desktop.theme.high_contrast);
@@ -343,19 +345,19 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
         .find(|w| w.id == window_id)
         .map(|w| w.app_id.clone())
         .expect("window app id");
-    let capabilities = create_rw_signal(CapabilitySet::new(
+    let capabilities = RwSignal::new(CapabilitySet::new(
         apps::resolved_capabilities(&state.get_untracked(), &app_id),
         runtime.host.get_value().host_capabilities(),
     ));
     let capability_app_id = app_id.clone();
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let desktop = state.get();
         capabilities.set(CapabilitySet::new(
             apps::resolved_capabilities(&desktop, &capability_app_id),
             runtime.host.get_value().host_capabilities(),
         ));
     });
-    let platform_dashboard = create_rw_signal(
+    let platform_dashboard = RwSignal::new(
         InstitutionalPlatformClientV1 {
             client_name: "origin-shell".to_string(),
             supported_services: Vec::new(),
@@ -375,7 +377,7 @@ fn ManagedWindowBody(window_id: WindowId) -> impl IntoView {
             true,
         ),
     );
-    let services = store_value(AppServices::new(
+    let services = StoredValue::new_local(AppServices::new(
         app_id.clone(),
         command_sender,
         capabilities.get_untracked(),

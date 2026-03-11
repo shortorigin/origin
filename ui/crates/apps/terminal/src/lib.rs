@@ -6,12 +6,12 @@
 
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
-use std::rc::Rc;
-
-use desktop_app_contract::{window_primary_input_dom_id, AppServices, WindowRuntimeId};
+use desktop_app_contract::{AppServices, WindowRuntimeId, window_primary_input_dom_id};
 use leptos::ev::KeyboardEvent;
 use leptos::html;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::tachys::view::any_view::{AnyView, IntoAny};
+use leptos::{logging, task::spawn_local};
 use platform_host::CapabilityStatus;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -361,32 +361,36 @@ fn render_table(table: StructuredTable) -> impl IntoView {
     }
 }
 
-fn render_data(data: StructuredData, _display: DisplayPreference) -> View {
+fn render_data(data: StructuredData, _display: DisplayPreference) -> AnyView {
     match data {
-        StructuredData::Empty => ().into_view(),
+        StructuredData::Empty => ().into_view().into_any(),
         StructuredData::Value(StructuredValue::Scalar(value)) => {
-            view! { <TerminalLine>{scalar_text(&value)}</TerminalLine> }.into_view()
+            view! { <TerminalLine>{scalar_text(&value)}</TerminalLine> }
+                .into_view()
+                .into_any()
         }
         StructuredData::Value(StructuredValue::Record(record)) | StructuredData::Record(record) => {
-            render_record(record).into_view()
+            render_record(record).into_view().into_any()
         }
         StructuredData::Value(StructuredValue::List(values)) | StructuredData::List(values) => {
-            render_list(values).into_view()
+            render_list(values).into_view().into_any()
         }
-        StructuredData::Table(table) => render_table(table).into_view(),
+        StructuredData::Table(table) => render_table(table).into_view().into_any(),
     }
 }
 
-fn render_entry(entry: TerminalTranscriptEntry) -> View {
+fn render_entry(entry: TerminalTranscriptEntry) -> AnyView {
     match entry {
         TerminalTranscriptEntry::Prompt { cwd, command, .. } => view! {
             <TerminalLine tone=TextTone::Secondary>{format!("{cwd} \u{203a} {command}")}</TerminalLine>
         }
-        .into_view(),
+        .into_view()
+        .into_any(),
         TerminalTranscriptEntry::Notice { notice, .. } => view! {
             <TerminalLine tone=TextTone::Accent>{notice.message}</TerminalLine>
         }
-        .into_view(),
+        .into_view()
+        .into_any(),
         TerminalTranscriptEntry::Data { data, display, .. } => render_data(data, display),
         TerminalTranscriptEntry::Progress { value, label, .. } => {
             let label = label.unwrap_or_else(|| "progress".to_string());
@@ -397,11 +401,13 @@ fn render_entry(entry: TerminalTranscriptEntry) -> View {
                 <TerminalLine tone=TextTone::Accent>{format!("{label}{suffix}")}</TerminalLine>
             }
             .into_view()
+            .into_any()
         }
         TerminalTranscriptEntry::System { text } => view! {
             <TerminalLine tone=TextTone::Secondary>{text}</TerminalLine>
         }
-        .into_view(),
+        .into_view()
+        .into_any(),
     }
 }
 
@@ -431,18 +437,18 @@ pub fn TerminalApp(
         .as_ref()
         .and_then(|services| services.commands.create_session(launch_cwd.clone()).ok());
     let services_for_persist = services.clone();
-    let cwd = create_rw_signal(launch_cwd.clone());
-    let input = create_rw_signal(String::new());
-    let transcript = create_rw_signal(default_terminal_transcript());
-    let suggestions = create_rw_signal(Vec::<ShellCompletionItem>::new());
-    let history_cursor = create_rw_signal::<Option<usize>>(None);
-    let active_execution = create_rw_signal::<Option<PersistedExecutionState>>(None);
-    let processed_events = create_rw_signal(0u64);
-    let pending_command = create_rw_signal::<Option<String>>(None);
-    let hydrated = create_rw_signal(false);
-    let last_saved = create_rw_signal::<Option<String>>(None);
-    let should_follow_output = create_rw_signal(true);
-    let terminal_screen = create_node_ref::<html::Div>();
+    let cwd = RwSignal::new(launch_cwd.clone());
+    let input = RwSignal::new(String::new());
+    let transcript = RwSignal::new(default_terminal_transcript());
+    let suggestions = RwSignal::new(Vec::<ShellCompletionItem>::new());
+    let history_cursor = RwSignal::new(None::<usize>);
+    let active_execution = RwSignal::new(None::<PersistedExecutionState>);
+    let processed_events = RwSignal::new(0u64);
+    let pending_command = RwSignal::new(None::<String>);
+    let hydrated = RwSignal::new(false);
+    let last_saved = RwSignal::new(None::<String>);
+    let should_follow_output = RwSignal::new(true);
+    let terminal_screen = NodeRef::<html::Div>::new();
     let prompt_mode = move || {
         if active_execution.get().is_some() {
             "running"
@@ -450,20 +456,19 @@ pub fn TerminalApp(
             mode_label
         }
     };
-    if let Some(restored_state) = restored_state.as_ref() {
-        if let Ok(restored) =
+    if let Some(restored_state) = restored_state.as_ref()
+        && let Ok(restored) =
             serde_json::from_value::<TerminalPersistedState>(restored_state.clone())
-        {
-            let restored = restore_terminal_state(restored, &launch_cwd);
-            let serialized = serde_json::to_string(&restored).ok();
-            cwd.set(restored.cwd);
-            input.set(restored.input);
-            transcript.set(restored.transcript);
-            history_cursor.set(restored.history_cursor);
-            active_execution.set(restored.active_execution);
-            last_saved.set(serialized);
-            hydrated.set(true);
-        }
+    {
+        let restored = restore_terminal_state(restored, &launch_cwd);
+        let serialized = serde_json::to_string(&restored).ok();
+        cwd.set(restored.cwd);
+        input.set(restored.input);
+        transcript.set(restored.transcript);
+        history_cursor.set(restored.history_cursor);
+        active_execution.set(restored.active_execution);
+        last_saved.set(serialized);
+        hydrated.set(true);
     }
     transcript.update(|entries| {
         entries.push(TerminalTranscriptEntry::System {
@@ -473,7 +478,7 @@ pub fn TerminalApp(
     });
     hydrated.set(true);
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if !hydrated.get() {
             return;
         }
@@ -513,7 +518,7 @@ pub fn TerminalApp(
     });
 
     if let Some(shell_session) = shell_session.clone() {
-        create_effect(move |_| {
+        Effect::new(move |_| {
             let events = shell_session.events.get();
             let already_processed = processed_events.get();
             let mut transcript_entries = transcript.get_untracked();
@@ -538,7 +543,7 @@ pub fn TerminalApp(
         });
     }
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let _transcript_len = transcript.get().len();
         let hydrated = hydrated.get();
         let should_follow_output = should_follow_output.get();
@@ -549,7 +554,9 @@ pub fn TerminalApp(
         scroll_terminal_to_bottom(&terminal_screen);
     });
 
-    let submit_command: Rc<dyn Fn(String)> = Rc::new({
+    let shell_session_handle = StoredValue::new_local(shell_session.clone());
+
+    let submit_command = StoredValue::new_local({
         let shell_session = shell_session.clone();
         move |command: String| {
             let command = command.trim().to_string();
@@ -612,7 +619,7 @@ pub fn TerminalApp(
         }
     });
 
-    let try_history_navigation: Rc<dyn Fn(i32)> = Rc::new({
+    let try_history_navigation = StoredValue::new_local({
         let services = services.clone();
         move |direction: i32| {
             let Some(services) = services.as_ref() else {
@@ -639,7 +646,7 @@ pub fn TerminalApp(
         }
     });
 
-    let trigger_completion: Rc<dyn Fn()> = Rc::new({
+    let trigger_completion = StoredValue::new_local({
         let shell_session = shell_session.clone();
         move || {
             let Some(shell_session) = shell_session.clone() else {
@@ -734,26 +741,32 @@ pub fn TerminalApp(
                                 "Enter" => {
                                     ev.prevent_default();
                                     ev.stop_propagation();
-                                    submit_command(input.get_untracked());
+                                    submit_command
+                                        .with_value(|submit_command| submit_command(input.get_untracked()));
                                 }
                                 "ArrowUp" => {
                                     ev.prevent_default();
-                                    try_history_navigation(-1);
+                                    try_history_navigation
+                                        .with_value(|try_history_navigation| try_history_navigation(-1));
                                 }
                                 "ArrowDown" => {
                                     ev.prevent_default();
-                                    try_history_navigation(1);
+                                    try_history_navigation
+                                        .with_value(|try_history_navigation| try_history_navigation(1));
                                 }
                                 "Tab" => {
                                     ev.prevent_default();
-                                    trigger_completion();
+                                    trigger_completion
+                                        .with_value(|trigger_completion| trigger_completion());
                                 }
                                 "Escape" => suggestions.set(Vec::new()),
                                 "c" | "C" if ev.ctrl_key() => {
-                                    if let Some(shell_session) = shell_session.clone() {
-                                        ev.prevent_default();
-                                        shell_session.cancel();
-                                    }
+                                    shell_session_handle.with_value(|shell_session| {
+                                        if let Some(shell_session) = shell_session.clone() {
+                                            ev.prevent_default();
+                                            shell_session.cancel();
+                                        }
+                                    });
                                 }
                                 "l" | "L" if ev.ctrl_key() => {
                                     ev.prevent_default();
@@ -859,8 +872,10 @@ mod tests {
         assert_eq!(processed, 7);
         assert!(active_execution.is_none());
         assert!(pending_command.is_none());
-        assert!(system_texts(&transcript)
-            .contains(&"Older shell session events were evicted from the in-memory log."));
+        assert!(
+            system_texts(&transcript)
+                .contains(&"Older shell session events were evicted from the in-memory log.")
+        );
         assert!(transcript.iter().any(|entry| matches!(
             entry,
             TerminalTranscriptEntry::Notice { execution_id, notice }

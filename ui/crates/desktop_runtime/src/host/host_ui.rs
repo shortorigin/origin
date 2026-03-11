@@ -1,8 +1,8 @@
 #[cfg(target_arch = "wasm32")]
 use desktop_app_contract::window_primary_input_dom_id;
-use leptos::{logging, spawn_local};
+use leptos::{logging, task::spawn_local};
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{closure::Closure, JsCast};
+use wasm_bindgen::{JsCast, closure::Closure};
 
 use crate::{host::DesktopHostContext, model::WindowRect};
 

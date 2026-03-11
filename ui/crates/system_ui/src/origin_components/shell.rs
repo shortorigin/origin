@@ -1,8 +1,9 @@
+use leptos::callback::Callable;
 use leptos::ev::KeyboardEvent;
-use leptos::*;
+use leptos::prelude::*;
 
 use crate::foundation::{
-    merge_layout_class, ButtonVariant, ControlTone, ElevationRole, SurfaceRole,
+    ButtonVariant, ControlTone, ElevationRole, SurfaceRole, merge_layout_class,
 };
 
 #[component]
@@ -79,12 +80,12 @@ pub fn DesktopIcon(
             data-ui-kind="desktop-icon-button"
             on:click=move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             }
             on:dblclick=move |ev| {
                 if let Some(on_dblclick) = on_dblclick.as_ref() {
-                    on_dblclick.call(ev);
+                    on_dblclick.run(ev);
                 }
             }
         >
@@ -134,12 +135,12 @@ pub fn Taskbar(
             aria-keyshortcuts=aria_keyshortcuts
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
         >
@@ -176,16 +177,16 @@ pub fn TaskbarButton(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional)] ui_slot: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_controls: MaybeSignal<String>,
-    #[prop(optional, into)] aria_haspopup: MaybeSignal<String>,
-    #[prop(optional, into)] aria_expanded: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_pressed: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_keyshortcuts: MaybeSignal<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] data_app: MaybeSignal<String>,
-    #[prop(optional, into)] selected: MaybeSignal<bool>,
-    #[prop(optional, into)] pressed: MaybeSignal<bool>,
+    #[prop(optional, into)] aria_controls: Signal<String>,
+    #[prop(optional, into)] aria_haspopup: Signal<String>,
+    #[prop(optional, into)] aria_expanded: Signal<bool>,
+    #[prop(optional, into)] aria_pressed: Signal<bool>,
+    #[prop(optional, into)] aria_keyshortcuts: Signal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] data_app: Signal<String>,
+    #[prop(optional, into)] selected: Signal<bool>,
+    #[prop(optional, into)] pressed: Signal<bool>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
     #[prop(optional)] on_contextmenu: Option<Callback<leptos::ev::MouseEvent>>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
@@ -210,17 +211,17 @@ pub fn TaskbarButton(
             control_tone=ControlTone::Neutral
             on_mousedown=Callback::new(move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             })
             on_contextmenu=Callback::new(move |ev| {
                 if let Some(on_contextmenu) = on_contextmenu.as_ref() {
-                    on_contextmenu.call(ev);
+                    on_contextmenu.run(ev);
                 }
             })
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -233,11 +234,11 @@ pub fn TaskbarButton(
 pub fn TaskbarOverflowButton(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] aria_controls: MaybeSignal<String>,
-    #[prop(optional, into)] aria_haspopup: MaybeSignal<String>,
-    #[prop(optional, into)] aria_expanded: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_keyshortcuts: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] aria_controls: Signal<String>,
+    #[prop(optional, into)] aria_haspopup: Signal<String>,
+    #[prop(optional, into)] aria_expanded: Signal<bool>,
+    #[prop(optional, into)] aria_keyshortcuts: Signal<String>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -253,7 +254,7 @@ pub fn TaskbarOverflowButton(
             ui_slot="taskbar-overflow-button"
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -285,12 +286,12 @@ pub fn Dock(
             aria-keyshortcuts=aria_keyshortcuts
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
         >
@@ -327,16 +328,16 @@ pub fn DockButton(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional)] ui_slot: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_controls: MaybeSignal<String>,
-    #[prop(optional, into)] aria_haspopup: MaybeSignal<String>,
-    #[prop(optional, into)] aria_expanded: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_pressed: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_keyshortcuts: MaybeSignal<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] data_app: MaybeSignal<String>,
-    #[prop(optional, into)] selected: MaybeSignal<bool>,
-    #[prop(optional, into)] pressed: MaybeSignal<bool>,
+    #[prop(optional, into)] aria_controls: Signal<String>,
+    #[prop(optional, into)] aria_haspopup: Signal<String>,
+    #[prop(optional, into)] aria_expanded: Signal<bool>,
+    #[prop(optional, into)] aria_pressed: Signal<bool>,
+    #[prop(optional, into)] aria_keyshortcuts: Signal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] data_app: Signal<String>,
+    #[prop(optional, into)] selected: Signal<bool>,
+    #[prop(optional, into)] pressed: Signal<bool>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
     #[prop(optional)] on_contextmenu: Option<Callback<leptos::ev::MouseEvent>>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
@@ -361,17 +362,17 @@ pub fn DockButton(
             control_tone=ControlTone::Neutral
             on_mousedown=Callback::new(move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             })
             on_contextmenu=Callback::new(move |ev| {
                 if let Some(on_contextmenu) = on_contextmenu.as_ref() {
-                    on_contextmenu.call(ev);
+                    on_contextmenu.run(ev);
                 }
             })
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -401,9 +402,9 @@ pub fn SystemTray(
 #[component]
 pub fn TrayButton(
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] pressed: MaybeSignal<bool>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] pressed: Signal<bool>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -416,7 +417,7 @@ pub fn TrayButton(
             ui_slot="tray-button"
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -429,11 +430,11 @@ pub fn TrayButton(
 pub fn ClockButton(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] aria_controls: MaybeSignal<String>,
-    #[prop(optional, into)] aria_haspopup: MaybeSignal<String>,
-    #[prop(optional, into)] aria_expanded: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_keyshortcuts: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] aria_controls: Signal<String>,
+    #[prop(optional, into)] aria_haspopup: Signal<String>,
+    #[prop(optional, into)] aria_expanded: Signal<bool>,
+    #[prop(optional, into)] aria_keyshortcuts: Signal<String>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -449,7 +450,7 @@ pub fn ClockButton(
             ui_slot="clock-button"
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -462,8 +463,8 @@ pub fn ClockButton(
 pub fn LauncherPanel(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] style: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] style: Signal<String>,
     #[prop(optional)] on_keydown: Option<Callback<KeyboardEvent>>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
@@ -482,12 +483,12 @@ pub fn LauncherPanel(
             data-ui-elevation-role=ElevationRole::Floating.token()
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
         >
@@ -500,7 +501,7 @@ pub fn LauncherPanel(
 pub fn SidePanel(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     #[prop(optional)] ui_slot: Option<&'static str>,
     #[prop(optional)] on_keydown: Option<Callback<KeyboardEvent>>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
@@ -520,12 +521,12 @@ pub fn SidePanel(
             data-ui-elevation-role=ElevationRole::Floating.token()
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
         >
@@ -538,7 +539,7 @@ pub fn SidePanel(
 pub fn NotificationCenter(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     #[prop(optional)] on_keydown: Option<Callback<KeyboardEvent>>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
@@ -557,12 +558,12 @@ pub fn NotificationCenter(
             data-ui-elevation-role=ElevationRole::Floating.token()
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
         >
@@ -574,9 +575,9 @@ pub fn NotificationCenter(
 #[component]
 pub fn QuickSettingTile(
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] selected: MaybeSignal<bool>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] selected: Signal<bool>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -591,7 +592,7 @@ pub fn QuickSettingTile(
             control_tone=ControlTone::Accent
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >
@@ -603,7 +604,7 @@ pub fn QuickSettingTile(
 #[component]
 pub fn SystemOverlay(
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] visible: MaybeSignal<bool>,
+    #[prop(optional, into)] visible: Signal<bool>,
     children: Children,
 ) -> impl IntoView {
     view! {

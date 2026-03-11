@@ -3,7 +3,7 @@
 #![warn(missing_docs, rustdoc::broken_intra_doc_links)]
 
 use desktop_app_contract::{AppCapability, AppServices};
-use leptos::*;
+use leptos::prelude::*;
 use sdk_rs::UiDashboardSnapshotV1;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -54,12 +54,12 @@ pub fn ControlCenterApp(
     services: Option<AppServices>,
 ) -> impl IntoView {
     let services = services.expect("control center requires app services");
-    let state = create_rw_signal(ControlCenterState::default());
+    let state = RwSignal::new(ControlCenterState::default());
 
-    if let Some(restored_state) = restored_state {
-        if let Ok(restored) = serde_json::from_value::<ControlCenterState>(restored_state) {
-            state.set(restored);
-        }
+    if let Some(restored_state) = restored_state
+        && let Ok(restored) = serde_json::from_value::<ControlCenterState>(restored_state)
+    {
+        state.set(restored);
     }
 
     if let Some(section) = launch_params.get("section").and_then(Value::as_str) {
@@ -75,7 +75,7 @@ pub fn ControlCenterApp(
     }
 
     let state_service = services.state.clone();
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Ok(serialized) = serde_json::to_value(state.get()) {
             state_service.persist_window_state(serialized);
         }
@@ -256,11 +256,7 @@ fn GuidanceSection() -> impl IntoView {
 }
 
 fn capability_flag(value: bool) -> &'static str {
-    if value {
-        "available"
-    } else {
-        "unavailable"
-    }
+    if value { "available" } else { "unavailable" }
 }
 
 fn capability_status_text(status: platform_host::CapabilityStatus) -> &'static str {

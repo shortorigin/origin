@@ -1,17 +1,19 @@
-use leptos::*;
+use leptos::callback::Callable;
+use leptos::prelude::*;
+use leptos::web_sys;
 
-use crate::foundation::{bool_token, merge_layout_class, ElevationRole, SurfaceRole};
+use crate::foundation::{ElevationRole, SurfaceRole, bool_token, merge_layout_class};
 
 #[component]
 pub fn WindowFrame(
     #[prop(default = SurfaceRole::Modal)] surface_role: SurfaceRole,
     #[prop(default = ElevationRole::Modal)] elevation_role: ElevationRole,
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] style: MaybeSignal<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] focused: MaybeSignal<bool>,
-    #[prop(optional, into)] minimized: MaybeSignal<bool>,
-    #[prop(optional, into)] maximized: MaybeSignal<bool>,
+    #[prop(optional, into)] style: Signal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] focused: Signal<bool>,
+    #[prop(optional, into)] minimized: Signal<bool>,
+    #[prop(optional, into)] maximized: Signal<bool>,
     #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -31,7 +33,7 @@ pub fn WindowFrame(
             data-ui-maximized=move || bool_token(maximized.get())
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             }
         >
@@ -58,12 +60,12 @@ pub fn WindowTitleBar(
             data-ui-elevation-role=ElevationRole::Raised.token()
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             }
             on:dblclick=move |ev| {
                 if let Some(on_dblclick) = on_dblclick.as_ref() {
-                    on_dblclick.call(ev);
+                    on_dblclick.run(ev);
                 }
             }
         >

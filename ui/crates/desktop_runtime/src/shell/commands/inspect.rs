@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use desktop_app_contract::AppCommandRegistration;
-use leptos::SignalGetUntracked;
+use leptos::prelude::{GetUntracked, GetValue};
 use platform_host::CapabilityStatus;
 use system_shell_contract::{
     CommandDataShape, CommandOutputShape, StructuredField, StructuredScalar, StructuredValue,

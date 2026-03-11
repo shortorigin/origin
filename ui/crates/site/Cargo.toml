@@ -1,7 +1,7 @@
 [package]
 name = "site"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [lib]
 crate-type = ["rlib", "cdylib"]
@@ -13,7 +13,7 @@ test = false
 
 [features]
 default = ["csr"]
-csr = ["desktop_runtime/csr", "leptos/csr", "leptos_meta/csr", "leptos_router/csr"]
+csr = ["desktop_runtime/csr", "leptos/csr"]
 desktop-tauri = ["desktop_runtime/desktop-tauri", "platform_host_web/desktop-host-tauri"]
 
 [dependencies]
