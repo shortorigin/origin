@@ -1,6 +1,6 @@
 //! Internal taskbar keyboard shortcut helpers shared by global and local handlers.
 
-use leptos::*;
+use leptos::prelude::*;
 
 use super::{
     activate_taskbar_shortcut_target, build_taskbar_shortcut_targets, DesktopAction,
@@ -42,7 +42,7 @@ fn dismiss_taskbar_overlay_menus(
 
 /// Handles taskbar-global shortcuts shared by window-level and taskbar-local key handlers.
 pub(super) fn try_handle_taskbar_shortcuts(
-    runtime: DesktopRuntimeContext,
+    runtime: &DesktopRuntimeContext,
     window_context_menu: RwSignal<Option<TaskbarWindowContextMenuState>>,
     overflow_menu_open: RwSignal<bool>,
     ev: &web_sys::KeyboardEvent,

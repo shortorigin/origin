@@ -14,7 +14,9 @@
 use std::{cell::Cell, collections::BTreeMap, rc::Rc};
 
 use futures::future::LocalBoxFuture;
-use leptos::{Callable, Callback, ReadSignal, RwSignal, SignalGet, View};
+use leptos::callback::{Callable, Callback};
+use leptos::prelude::{Get, ReadSignal, RwSignal};
+use leptos::tachys::view::any_view::AnyView;
 use platform_host::{
     load_app_state_with_migration, load_pref_with, save_app_state_with, save_pref_with,
     AppStateEnvelope, AppStateStore, CapabilityStatus, ContentCache, ExplorerBackendStatus,
@@ -431,7 +433,7 @@ pub struct WindowService {
 impl WindowService {
     /// Requests a title change for the current window.
     pub fn set_title(&self, title: impl Into<String>) {
-        self.sender.call(AppCommand::SetWindowTitle {
+        self.sender.run(AppCommand::SetWindowTitle {
             title: title.into(),
         });
     }
@@ -448,12 +450,12 @@ pub struct StateService {
 impl StateService {
     /// Persists manager-owned state for this window instance.
     pub fn persist_window_state(&self, state: Value) {
-        self.sender.call(AppCommand::PersistState { state });
+        self.sender.run(AppCommand::PersistState { state });
     }
 
     /// Persists app-shared state under `key`.
     pub fn persist_shared_state(&self, key: impl Into<String>, state: Value) {
-        self.sender.call(AppCommand::PersistSharedState {
+        self.sender.run(AppCommand::PersistSharedState {
             key: key.into(),
             state,
         });
@@ -491,7 +493,7 @@ impl ConfigService {
     pub fn save(&self, namespace: impl Into<String>, key: impl Into<String>, value: Value) {
         let namespace = namespace.into();
         let key = key.into();
-        self.sender.call(AppCommand::SaveConfig {
+        self.sender.run(AppCommand::SaveConfig {
             namespace,
             key,
             value,
@@ -686,19 +688,19 @@ pub struct ThemeService {
 impl ThemeService {
     /// Requests theme-family toggle.
     pub fn set_dark_mode(&self, enabled: bool) {
-        self.sender.call(AppCommand::SetDesktopDarkMode { enabled });
+        self.sender.run(AppCommand::SetDesktopDarkMode { enabled });
     }
 
     /// Requests high contrast toggle.
     pub fn set_high_contrast(&self, enabled: bool) {
         self.sender
-            .call(AppCommand::SetDesktopHighContrast { enabled });
+            .run(AppCommand::SetDesktopHighContrast { enabled });
     }
 
     /// Requests reduced motion toggle.
     pub fn set_reduced_motion(&self, enabled: bool) {
         self.sender
-            .call(AppCommand::SetDesktopReducedMotion { enabled });
+            .run(AppCommand::SetDesktopReducedMotion { enabled });
     }
 }
 
@@ -711,7 +713,7 @@ pub struct NotificationService {
 impl NotificationService {
     /// Emits a host notification request.
     pub fn notify(&self, title: impl Into<String>, body: impl Into<String>) {
-        self.sender.call(AppCommand::Notify {
+        self.sender.run(AppCommand::Notify {
             title: title.into(),
             body: body.into(),
         });
@@ -727,21 +729,21 @@ pub struct IpcService {
 impl IpcService {
     /// Subscribes this window to a topic.
     pub fn subscribe(&self, topic: impl Into<String>) {
-        self.sender.call(AppCommand::Subscribe {
+        self.sender.run(AppCommand::Subscribe {
             topic: topic.into(),
         });
     }
 
     /// Unsubscribes this window from a topic.
     pub fn unsubscribe(&self, topic: impl Into<String>) {
-        self.sender.call(AppCommand::Unsubscribe {
+        self.sender.run(AppCommand::Unsubscribe {
             topic: topic.into(),
         });
     }
 
     /// Publishes a one-way event payload.
     pub fn publish(&self, topic: impl Into<String>, payload: Value) {
-        self.sender.call(AppCommand::PublishEvent {
+        self.sender.run(AppCommand::PublishEvent {
             topic: topic.into(),
             payload,
             correlation_id: None,
@@ -757,7 +759,7 @@ impl IpcService {
         correlation_id: impl Into<String>,
         reply_to: impl Into<String>,
     ) {
-        self.sender.call(AppCommand::PublishEvent {
+        self.sender.run(AppCommand::PublishEvent {
             topic: topic.into(),
             payload,
             correlation_id: Some(correlation_id.into()),
@@ -1029,7 +1031,7 @@ impl CommandService {
     /// Creates a disabled command service that rejects all requests deterministically.
     pub fn disabled() -> Self {
         Self::new(
-            leptos::create_rw_signal(Vec::new()).read_only(),
+            RwSignal::new(Vec::new()).read_only(),
             Rc::new(|_| Err("command sessions are unavailable".to_string())),
             Rc::new(|_| Err("command registration is unavailable".to_string())),
             Rc::new(|_| Err("command registration is unavailable".to_string())),
@@ -1186,7 +1188,7 @@ pub struct AppMountContext {
 }
 
 /// Static app mount function used by the runtime registry.
-pub type AppMountFn = fn(AppMountContext) -> View;
+pub type AppMountFn = fn(AppMountContext) -> AnyView;
 
 #[derive(Debug, Clone, Copy)]
 /// Mounted app module descriptor used by the runtime app registry.
@@ -1201,7 +1203,7 @@ impl AppModule {
     }
 
     /// Mounts the app view with a runtime-provided context.
-    pub fn mount(self, context: AppMountContext) -> View {
+    pub fn mount(self, context: AppMountContext) -> AnyView {
         (self.mount_fn)(context)
     }
 }
@@ -1281,7 +1283,7 @@ pub struct AppRegistration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use leptos::{create_runtime, create_rw_signal};
+    use leptos::prelude::Owner;
     use std::collections::BTreeMap;
 
     #[test]
@@ -1374,9 +1376,10 @@ mod tests {
 
     #[test]
     fn state_service_loads_shared_state_for_current_app() {
-        let runtime = create_runtime();
+        let owner = Owner::new();
+        owner.set();
         let sender = Callback::new(|_: AppCommand| {});
-        let shared_state = create_rw_signal(BTreeMap::from([(
+        let shared_state = RwSignal::new(BTreeMap::from([(
             "system.settings:appearance".to_string(),
             serde_json::json!({ "tab": "appearance" }),
         )]));
@@ -1392,7 +1395,7 @@ mod tests {
         );
         assert_eq!(service.load_shared_state("missing"), None);
 
-        runtime.dispose();
+        owner.cleanup();
     }
 
     #[test]

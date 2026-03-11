@@ -1,5 +1,7 @@
+use leptos::callback::Callable;
 use leptos::ev::KeyboardEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::web_sys;
 
 use crate::foundation::{
     bool_token, merge_layout_class, ButtonShape, ButtonSize, ButtonVariant, ControlTone,
@@ -15,20 +17,20 @@ pub fn Button(
     #[prop(optional)] layout_class: Option<&'static str>,
     #[prop(optional, into)] id: Option<String>,
     #[prop(optional, into)] role: Option<String>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] aria_controls: MaybeSignal<String>,
-    #[prop(optional, into)] aria_expanded: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_haspopup: MaybeSignal<String>,
-    #[prop(optional, into)] aria_checked: MaybeSignal<String>,
-    #[prop(optional, into)] aria_pressed: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_keyshortcuts: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] data_app: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] aria_controls: Signal<String>,
+    #[prop(optional, into)] aria_expanded: Signal<bool>,
+    #[prop(optional, into)] aria_haspopup: Signal<String>,
+    #[prop(optional, into)] aria_checked: Signal<String>,
+    #[prop(optional, into)] aria_pressed: Signal<bool>,
+    #[prop(optional, into)] aria_keyshortcuts: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] data_app: Signal<String>,
     #[prop(optional)] tabindex: Option<i32>,
     #[prop(optional)] ui_slot: Option<&'static str>,
-    #[prop(optional, into)] disabled: MaybeSignal<bool>,
-    #[prop(optional, into)] selected: MaybeSignal<bool>,
-    #[prop(optional, into)] pressed: MaybeSignal<bool>,
+    #[prop(optional, into)] disabled: Signal<bool>,
+    #[prop(optional, into)] selected: Signal<bool>,
+    #[prop(optional, into)] pressed: Signal<bool>,
     #[prop(optional)] leading_icon: Option<IconName>,
     #[prop(optional)] trailing_icon: Option<IconName>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
@@ -79,32 +81,32 @@ pub fn Button(
             data-ui-disabled=move || bool_token(disabled.get())
             on:click=move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             }
             on:keydown=move |ev| {
                 if let Some(on_keydown) = on_keydown.as_ref() {
-                    on_keydown.call(ev);
+                    on_keydown.run(ev);
                 }
             }
             on:mousedown=move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             }
             on:dblclick=move |ev| {
                 if let Some(on_dblclick) = on_dblclick.as_ref() {
-                    on_dblclick.call(ev);
+                    on_dblclick.run(ev);
                 }
             }
             on:contextmenu=move |ev| {
                 if let Some(on_contextmenu) = on_contextmenu.as_ref() {
-                    on_contextmenu.call(ev);
+                    on_contextmenu.run(ev);
                 }
             }
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             }
         >
@@ -122,11 +124,11 @@ pub fn IconButton(
     #[prop(default = ButtonSize::Md)] size: ButtonSize,
     #[prop(default = ControlTone::Neutral)] control_tone: ControlTone,
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
     #[prop(optional)] ui_slot: Option<&'static str>,
-    #[prop(optional, into)] disabled: MaybeSignal<bool>,
-    #[prop(optional, into)] pressed: MaybeSignal<bool>,
+    #[prop(optional, into)] disabled: Signal<bool>,
+    #[prop(optional, into)] pressed: Signal<bool>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
 ) -> impl IntoView {
     view! {
@@ -148,7 +150,7 @@ pub fn IconButton(
             data-ui-disabled=move || bool_token(disabled.get())
             on:click=move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             }
         >

@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 
 use crate::foundation::{merge_layout_class, TextRole, TextTone};
 

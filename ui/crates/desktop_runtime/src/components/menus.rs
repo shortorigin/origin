@@ -1,6 +1,9 @@
 use super::*;
 use crate::model::{DesktopNotification, ThemeMode};
+use leptos::callback::Callable;
 use leptos::ev::MouseEvent;
+use leptos::prelude::GetValue;
+use leptos::tachys::view::any_view::IntoAny;
 use system_ui::components::{
     LauncherPanel as SystemLauncherPanel, MenuItem, MenuSurface,
     NotificationCenter as SystemNotificationCenter, QuickSettingTile, SidePanel as SystemSidePanel,
@@ -20,7 +23,7 @@ pub(super) fn DesktopContextMenu(
         <Show when=move || desktop_context_menu.get().is_some() fallback=|| ()>
             {move || {
                 let Some(menu) = desktop_context_menu.get() else {
-                    return ().into_view();
+                    return ().into_view().into_any();
                 };
                 let menu_style = format!("left:{}px;top:{}px;", menu.x, menu.y);
 
@@ -60,7 +63,7 @@ pub(super) fn DesktopContextMenu(
                             on_click=Callback::new(move |ev| {
                                 stop_mouse_event(&ev);
                                 desktop_context_menu.set(None);
-                                open_system_settings.call(());
+                                open_system_settings.run(());
                             })
                         >
                             "Properties..."
@@ -68,6 +71,7 @@ pub(super) fn DesktopContextMenu(
                     </MenuSurface>
                 }
                     .into_view()
+                    .into_any()
             }}
         </Show>
     }
@@ -93,7 +97,7 @@ pub(super) fn StartMenu(
                     if ev.key() == "Escape" {
                         ev.prevent_default();
                         ev.stop_propagation();
-                        close_launcher.call(());
+                        close_launcher.run(());
                         let _ = focus_element_by_id(return_focus_id);
                     }
                 })
@@ -117,7 +121,7 @@ pub(super) fn StartMenu(
                                 id=app_dom_id
                                 role="menuitem"
                                 on_click=Callback::new(move |_| {
-                                    activate_app.call(app_id.clone());
+                                    activate_app.run(app_id.clone());
                                 })
                             >
                                 <span aria-hidden="true">
@@ -132,7 +136,7 @@ pub(super) fn StartMenu(
                 <MenuItem
                     id="desktop-launcher-item-close"
                     role="menuitem"
-                    on_click=Callback::new(move |_| close_launcher.call(()))
+                    on_click=Callback::new(move |_| close_launcher.run(()))
                 >
                     "Close"
                 </MenuItem>
@@ -197,7 +201,7 @@ pub(super) fn OverflowMenu(
                             window_context_menu.set(None);
                             runtime.dispatch_action(DesktopAction::CloseStartMenu);
                             let desktop = runtime.state.get_untracked();
-                            focus_or_unminimize_window(runtime, &desktop, win.id);
+                            focus_or_unminimize_window(&runtime, &desktop, win.id);
                         })
                         on_contextmenu=Callback::new(move |ev: MouseEvent| {
                             ev.prevent_default();
@@ -253,7 +257,7 @@ pub(super) fn ControlCenterPanel(
                     if ev.key() == "Escape" {
                         ev.prevent_default();
                         ev.stop_propagation();
-                        close_panel.call(());
+                        close_panel.run(());
                         let _ = focus_element_by_id(return_focus_id);
                     }
                 })
@@ -267,7 +271,7 @@ pub(super) fn ControlCenterPanel(
                     <MenuItem
                         id="control-center-open-settings"
                         role="button"
-                        on_click=Callback::new(move |_| open_settings.call(()))
+                        on_click=Callback::new(move |_| open_settings.run(()))
                     >
                         "Settings"
                     </MenuItem>
@@ -277,7 +281,7 @@ pub(super) fn ControlCenterPanel(
                     <QuickSettingTile
                         aria_label="Toggle dark theme"
                         selected=Signal::derive(move || matches!(theme_mode.get(), ThemeMode::Dark))
-                        on_click=Callback::new(move |_| toggle_theme_mode.call(()))
+                        on_click=Callback::new(move |_| toggle_theme_mode.run(()))
                     >
                         <span aria-hidden="true">
                             {move || {
@@ -294,7 +298,7 @@ pub(super) fn ControlCenterPanel(
                     <QuickSettingTile
                         aria_label="Toggle high contrast"
                         selected=high_contrast
-                        on_click=Callback::new(move |_| toggle_high_contrast.call(()))
+                        on_click=Callback::new(move |_| toggle_high_contrast.run(()))
                     >
                         <span aria-hidden="true">
                             <Icon icon=IconName::WifiOn size=IconSize::Sm />
@@ -305,7 +309,7 @@ pub(super) fn ControlCenterPanel(
                     <QuickSettingTile
                         aria_label="Toggle reduced motion"
                         selected=reduced_motion
-                        on_click=Callback::new(move |_| toggle_reduced_motion.call(()))
+                        on_click=Callback::new(move |_| toggle_reduced_motion.run(()))
                     >
                         <span aria-hidden="true">
                             <Icon icon=IconName::MotionOff size=IconSize::Sm />
@@ -346,7 +350,7 @@ pub(super) fn NotificationCenterPanel(
                     if ev.key() == "Escape" {
                         ev.prevent_default();
                         ev.stop_propagation();
-                        close_panel.call(());
+                        close_panel.run(());
                         let _ = focus_element_by_id(return_focus_id);
                     }
                 })
@@ -360,7 +364,7 @@ pub(super) fn NotificationCenterPanel(
                     <MenuItem
                         id="notification-center-clear"
                         role="button"
-                        on_click=Callback::new(move |_| clear_notifications.call(()))
+                        on_click=Callback::new(move |_| clear_notifications.run(()))
                     >
                         "Clear All"
                     </MenuItem>
@@ -389,7 +393,7 @@ pub(super) fn NotificationCenterPanel(
                                     id=format!("notification-dismiss-{}", notification.id)
                                     role="button"
                                     on_click=Callback::new(move |_| {
-                                        dismiss_notification.call(notification.id);
+                                        dismiss_notification.run(notification.id);
                                     })
                                 >
                                     "Dismiss"
@@ -436,7 +440,7 @@ pub(super) fn TaskbarWindowContextMenu(
                         .find(|win| win.id == menu.window_id)
                         .map(|win| (menu, win))
                 }) else {
-                    return ().into_view();
+                    return ().into_view().into_any();
                 };
 
                 let menu_style = format!("left:{}px;top:{}px;", menu.x, menu.y);
@@ -480,7 +484,7 @@ pub(super) fn TaskbarWindowContextMenu(
                             on_click=Callback::new(move |_| {
                                 window_context_menu.set(None);
                                 let desktop = runtime.state.get_untracked();
-                                focus_or_unminimize_window(runtime, &desktop, window_id);
+                                focus_or_unminimize_window(&runtime, &desktop, window_id);
                             })
                         >
                             "Focus"
@@ -535,6 +539,7 @@ pub(super) fn TaskbarWindowContextMenu(
                     </MenuSurface>
                 }
                     .into_view()
+                    .into_any()
             }}
         </Show>
     }

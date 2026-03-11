@@ -3,6 +3,8 @@
 #[cfg(target_arch = "wasm32")]
 use js_sys::Function;
 #[cfg(target_arch = "wasm32")]
+use leptos::task::spawn_local;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
@@ -46,7 +48,7 @@ fn is_local_dev_host() -> bool {
 
 #[cfg(target_arch = "wasm32")]
 fn unregister_service_workers(service_worker: JsValue) {
-    leptos::spawn_local(async move {
+    spawn_local(async move {
         let Ok(get_registrations) = js_sys::Reflect::get(
             &service_worker,
             &wasm_bindgen::JsValue::from_str("getRegistrations"),

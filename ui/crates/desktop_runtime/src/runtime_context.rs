@@ -5,7 +5,9 @@
 //! [`crate::components`].
 #![allow(clippy::clone_on_copy)]
 
-use leptos::*;
+use leptos::callback::Callable;
+use leptos::logging;
+use leptos::prelude::*;
 use platform_host::HostServices;
 
 use crate::{
@@ -21,9 +23,9 @@ use crate::{
 /// Leptos context for reading desktop runtime state and dispatching [`DesktopAction`] values.
 pub struct DesktopRuntimeContext {
     /// Host service bundle for executing runtime side effects and environment queries.
-    pub host: StoredValue<DesktopHostContext>,
+    pub host: StoredValue<DesktopHostContext, LocalStorage>,
     /// Long-lived reactive owner for runtime-managed resources that must outlive transient app views.
-    pub owner: Owner,
+    pub owner: StoredValue<Owner, LocalStorage>,
     /// Reactive desktop state signal.
     pub state: RwSignal<DesktopState>,
     /// Reactive pointer/drag/resize interaction state signal.
@@ -35,13 +37,13 @@ pub struct DesktopRuntimeContext {
     /// Reducer dispatch callback.
     pub dispatch: Callback<DesktopAction>,
     /// Shared shell engine and command registry.
-    pub shell_engine: StoredValue<system_shell::ShellEngine>,
+    pub shell_engine: StoredValue<system_shell::ShellEngine, LocalStorage>,
 }
 
 impl DesktopRuntimeContext {
     /// Dispatches a reducer action through the runtime context callback.
     pub fn dispatch_action(&self, action: DesktopAction) {
-        self.dispatch.call(action);
+        self.dispatch.run(action);
     }
 }
 
@@ -49,10 +51,9 @@ fn install_runtime_orchestration(
     runtime: DesktopRuntimeContext,
     initial_deep_link: Option<DeepLinkState>,
 ) {
-    runtime
-        .host
-        .get_value()
-        .install_boot_hydration(runtime.dispatch, initial_deep_link);
+    runtime.host.with_value(|host| {
+        host.install_boot_hydration(runtime.dispatch, initial_deep_link);
+    });
     std::mem::forget(shell::register_builtin_commands(runtime));
     effect_executor::install(runtime);
 }
@@ -66,13 +67,13 @@ pub fn DesktopProvider(
     initial_deep_link: Option<DeepLinkState>,
     children: Children,
 ) -> impl IntoView {
-    let host = store_value(DesktopHostContext::new(host_services));
-    let owner = Owner::current().expect("DesktopProvider owner");
-    let state = create_rw_signal(DesktopState::default());
-    let interaction = create_rw_signal(InteractionState::default());
-    let effects = create_rw_signal(Vec::<RuntimeEffect>::new());
-    let app_runtime = create_rw_signal(AppRuntimeState::default());
-    let shell_engine = store_value(system_shell::ShellEngine::new());
+    let host = StoredValue::new_local(DesktopHostContext::new(host_services));
+    let owner = StoredValue::new_local(Owner::current().expect("DesktopProvider owner"));
+    let state = RwSignal::new(DesktopState::default());
+    let interaction = RwSignal::new(InteractionState::default());
+    let effects = RwSignal::new(Vec::<RuntimeEffect>::new());
+    let app_runtime = RwSignal::new(AppRuntimeState::default());
+    let shell_engine = StoredValue::new_local(system_shell::ShellEngine::new());
 
     let dispatch = Callback::new(move |action: DesktopAction| {
         let mut desktop = state.get_untracked();
@@ -145,7 +146,7 @@ pub fn use_desktop_runtime() -> DesktopRuntimeContext {
 }
 
 /// Opens System Settings by focusing an existing window or creating a new one.
-pub(crate) fn open_system_settings(runtime: DesktopRuntimeContext, taskbar_height_px: i32) {
+pub(crate) fn open_system_settings(runtime: &DesktopRuntimeContext, taskbar_height_px: i32) {
     let desktop = runtime.state.get_untracked();
     let app_id = apps::settings_application_id();
     if let Some(window_id) = crate::components::preferred_window_for_app(&desktop, &app_id) {

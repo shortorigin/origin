@@ -31,5 +31,5 @@ pub fn mount() {
         .expect("site app root element should exist")
         .dyn_into::<web_sys::HtmlElement>()
         .expect("site app root should be an HtmlElement");
-    leptos::mount_to(app_root, || leptos::view! { <SiteApp /> })
+    leptos::mount::mount_to(app_root, || leptos::view! { <SiteApp /> }).forget();
 }

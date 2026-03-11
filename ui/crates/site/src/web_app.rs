@@ -4,9 +4,13 @@ use desktop_runtime::{
     current_browser_e2e_config, use_desktop_runtime, BrowserE2eConfig, DesktopAction,
     DesktopProvider, DesktopShell,
 };
-use leptos::*;
+use leptos::prelude::*;
+#[cfg(target_arch = "wasm32")]
+use leptos::task::spawn_local;
 use leptos_meta::*;
-use leptos_router::*;
+use leptos_router::components::{Route, Router, Routes, A};
+use leptos_router::hooks::use_params_map;
+use leptos_router::path;
 use platform_host_web::build_host_services;
 #[cfg(target_arch = "wasm32")]
 use platform_host_web::{
@@ -47,10 +51,10 @@ pub fn SiteApp() -> impl IntoView {
 
         <Router>
             <main class="site-root">
-                <Routes>
-                    <Route path="" view=DesktopEntry />
-                    <Route path="/notes/:slug" view=CanonicalNoteRoute />
-                    <Route path="/projects/:slug" view=CanonicalProjectRoute />
+                <Routes fallback=|| view! { <p>"Not found."</p> }>
+                    <Route path=path!("") view=DesktopEntry />
+                    <Route path=path!("/notes/:slug") view=CanonicalNoteRoute />
+                    <Route path=path!("/projects/:slug") view=CanonicalProjectRoute />
                 </Routes>
             </main>
         </Router>
@@ -82,7 +86,7 @@ pub fn DesktopEntry() -> impl IntoView {
 fn DesktopUrlBoot() -> impl IntoView {
     let runtime = use_desktop_runtime();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if !runtime.state.get().boot_hydrated {
             return;
         }
@@ -98,7 +102,7 @@ fn DesktopUrlBoot() -> impl IntoView {
 
 #[component]
 fn BrowserRuntimeEnhancements() -> impl IntoView {
-    create_effect(move |_| {
+    Effect::new(move |_| {
         crate::pwa::register_service_worker();
     });
 
@@ -115,14 +119,33 @@ fn BrowserShellSync() -> impl IntoView {
         use desktop_runtime::{load_durable_boot_snapshot, load_theme, HydrationMode};
         use wasm_bindgen::{closure::Closure, JsCast};
 
+        enum BrowserShellSyncBinding {
+            Active {
+                channel: web_sys::BroadcastChannel,
+                callback: Closure<dyn FnMut(web_sys::MessageEvent)>,
+            },
+            Inactive,
+        }
+
+        impl Drop for BrowserShellSyncBinding {
+            fn drop(&mut self) {
+                if let Self::Active { channel, callback } = self {
+                    channel.set_onmessage(None);
+                    channel.close();
+                    let _ = callback;
+                }
+            }
+        }
+
         let host = runtime.host.get_value();
-        create_effect(move |_| {
+        Effect::new(move |binding: Option<BrowserShellSyncBinding>| {
+            drop(binding);
             if !platform_host_web::broadcast_channel_supported() {
-                return;
+                return BrowserShellSyncBinding::Inactive;
             }
 
             let Ok(channel) = web_sys::BroadcastChannel::new("origin-os-shell-sync") else {
-                return;
+                return BrowserShellSyncBinding::Inactive;
             };
             let runtime = runtime.clone();
             let host = host.clone();
@@ -151,7 +174,7 @@ fn BrowserShellSync() -> impl IntoView {
                             }
                             let runtime = runtime.clone();
                             let host = host.clone();
-                            leptos::spawn_local(async move {
+                            spawn_local(async move {
                                 if let Some(theme) = load_theme(&host).await {
                                     runtime.dispatch_action(DesktopAction::HydrateTheme {
                                         theme,
@@ -170,7 +193,7 @@ fn BrowserShellSync() -> impl IntoView {
                             }
                             let runtime = runtime.clone();
                             let host = host.clone();
-                            leptos::spawn_local(async move {
+                            spawn_local(async move {
                                 if let Some(snapshot) = load_durable_boot_snapshot(&host).await {
                                     runtime.dispatch_action(DesktopAction::HydrateSnapshot {
                                         snapshot,
@@ -186,11 +209,7 @@ fn BrowserShellSync() -> impl IntoView {
 
             channel.set_onmessage(Some(callback.as_ref().unchecked_ref()));
 
-            on_cleanup(move || {
-                channel.set_onmessage(None);
-                channel.close();
-                drop(callback);
-            });
+            BrowserShellSyncBinding::Active { channel, callback }
         });
     }
 
@@ -202,7 +221,7 @@ fn CanonicalNoteRoute() -> impl IntoView {
     let params = use_params_map();
     let slug = move || {
         params
-            .with(|map| map.get("slug").cloned())
+            .with(|map| map.get("slug"))
             .unwrap_or_else(|| "unknown".to_string())
     };
 
@@ -221,7 +240,7 @@ fn CanonicalProjectRoute() -> impl IntoView {
     let params = use_params_map();
     let slug = move || {
         params
-            .with(|map| map.get("slug").cloned())
+            .with(|map| map.get("slug"))
             .unwrap_or_else(|| "unknown".to_string())
     };
 

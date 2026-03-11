@@ -1,0 +1,68 @@
+{
+  "issue_id": 130,
+  "issue_url": "https://github.com/shortorigin/origin/issues/130",
+  "branch": "refactor/130-ui-framework-modernization",
+  "primary_architectural_plane": "ui",
+  "owning_subsystem": "ui shell runtime, browser host adapters, and desktop host integration",
+  "architectural_references": [
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "docs/architecture/layer-boundaries.md",
+    "docs/process/execution-artifacts.md",
+    "docs/process/platform-regression-guardrails.md",
+    "ui/README.md"
+  ],
+  "allowed_touchpoints": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "ui/",
+    "platform/sdk/",
+    "shared/",
+    "plans/",
+    "docs/"
+  ],
+  "non_goals": [
+    "Do not change UI ownership boundaries.",
+    "Do not create direct ui -> services coupling.",
+    "Do not fork browser and desktop contract models.",
+    "Do not perform the Edition 2024 uplift in this phase."
+  ],
+  "scope_in": [
+    "Add the phase-3 execution-artifact bundle.",
+    "Upgrade leptos, leptos_meta, leptos_router, wasm-bindgen, wasm-bindgen-futures, js-sys, web-sys, and coupled helpers as a coordinated UI stack.",
+    "Refresh Tauri and plugin crates only if newer stable releases are available and compatible with the existing 2.x host model.",
+    "Resolve resulting compile, runtime, and validation regressions while preserving browser and desktop parity."
+  ],
+  "scope_out": [
+    "Non-UI runtime and storage major-version upgrades.",
+    "Workspace-wide async trait modernization.",
+    "Edition 2024 uplift."
+  ],
+  "target_paths": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "ui/",
+    "plans/"
+  ],
+  "acceptance_criteria": [
+    "The UI Leptos and WASM dependency stack is upgraded to the latest stable 0.8 / current stable browser bindings line at execution time.",
+    "cargo xtask verify profile ui passes after the migration.",
+    "cargo xtask ui-hardening passes without reintroducing the floating-toolchain finding.",
+    "Browser and desktop host checks continue to pass without introducing new architecture-boundary violations."
+  ],
+  "validation_commands": [
+    "cargo check -p desktop_runtime",
+    "cargo check -p site",
+    "cargo check -p desktop_tauri",
+    "cargo xtask verify profile ui",
+    "cargo xtask ui-hardening"
+  ],
+  "validation_artifacts": [
+    "Passing desktop_runtime, site, and desktop_tauri check output",
+    "Passing UI verification and hardening output",
+    "Committed phase-3 plans and UI dependency updates"
+  ],
+  "rollback_path": "Revert the phase-3 UI dependency graph update, lockfile refresh, and UI compatibility fixes together so browser and desktop hosts return to the previous validated stack.",
+  "exec_plan_required": true,
+  "exec_plan_path": "plans/130-ui-framework-modernization/EXEC_PLAN.md"
+}

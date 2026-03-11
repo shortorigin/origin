@@ -4,7 +4,7 @@ use desktop_app_contract::{
     AppCapability, AppCommandContext, AppCommandRegistration, ApplicationId,
     CommandRegistrationHandle as AppCommandRegistrationHandle,
 };
-use leptos::SignalGetUntracked;
+use leptos::prelude::{GetUntracked, GetValue};
 use system_shell::CommandExecutionContext;
 use system_shell_contract::{
     CommandDescriptor, CommandNoticeLevel, CommandScope, ShellStreamEvent,

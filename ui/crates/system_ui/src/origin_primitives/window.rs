@@ -1,4 +1,6 @@
-use leptos::*;
+use leptos::callback::Callable;
+use leptos::prelude::*;
+use leptos::web_sys;
 
 use crate::foundation::{
     bool_token, merge_layout_class, ButtonSize, ButtonVariant, ControlTone, ElevationRole,
@@ -10,11 +12,11 @@ pub fn WindowSurface(
     #[prop(default = SurfaceRole::Modal)] surface_role: SurfaceRole,
     #[prop(default = ElevationRole::Modal)] elevation_role: ElevationRole,
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] style: MaybeSignal<String>,
-    #[prop(optional, into)] focused: MaybeSignal<bool>,
-    #[prop(optional, into)] minimized: MaybeSignal<bool>,
-    #[prop(optional, into)] maximized: MaybeSignal<bool>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
+    #[prop(optional, into)] style: Signal<String>,
+    #[prop(optional, into)] focused: Signal<bool>,
+    #[prop(optional, into)] minimized: Signal<bool>,
+    #[prop(optional, into)] maximized: Signal<bool>,
+    #[prop(optional, into)] aria_label: Signal<String>,
     #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -34,7 +36,7 @@ pub fn WindowSurface(
             data-ui-maximized=move || bool_token(maximized.get())
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             }
         >
@@ -61,12 +63,12 @@ pub fn TitlebarRegion(
             data-ui-elevation-role=ElevationRole::Raised.token()
             on:pointerdown=move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             }
             on:dblclick=move |ev| {
                 if let Some(on_dblclick) = on_dblclick.as_ref() {
-                    on_dblclick.call(ev);
+                    on_dblclick.run(ev);
                 }
             }
         >
@@ -133,9 +135,9 @@ pub fn WindowBody(
 pub fn WindowControlButton(
     #[prop(default = ControlTone::Neutral)] control_tone: ControlTone,
     #[prop(optional)] layout_class: Option<&'static str>,
-    #[prop(optional, into)] aria_label: MaybeSignal<String>,
-    #[prop(optional, into)] title: MaybeSignal<String>,
-    #[prop(optional, into)] disabled: MaybeSignal<bool>,
+    #[prop(optional, into)] aria_label: Signal<String>,
+    #[prop(optional, into)] title: Signal<String>,
+    #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional)] on_pointerdown: Option<Callback<web_sys::PointerEvent>>,
     #[prop(optional)] on_mousedown: Option<Callback<leptos::ev::MouseEvent>>,
     #[prop(optional)] on_click: Option<Callback<leptos::ev::MouseEvent>>,
@@ -153,17 +155,17 @@ pub fn WindowControlButton(
             ui_slot="window-control"
             on_pointerdown=Callback::new(move |ev| {
                 if let Some(on_pointerdown) = on_pointerdown.as_ref() {
-                    on_pointerdown.call(ev);
+                    on_pointerdown.run(ev);
                 }
             })
             on_mousedown=Callback::new(move |ev| {
                 if let Some(on_mousedown) = on_mousedown.as_ref() {
-                    on_mousedown.call(ev);
+                    on_mousedown.run(ev);
                 }
             })
             on_click=Callback::new(move |ev| {
                 if let Some(on_click) = on_click.as_ref() {
-                    on_click.call(ev);
+                    on_click.run(ev);
                 }
             })
         >

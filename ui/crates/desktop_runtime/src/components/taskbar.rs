@@ -1,5 +1,7 @@
 use super::*;
+use leptos::ev;
 use leptos::ev::MouseEvent;
+use leptos::prelude::GetValue;
 use system_ui::components::{
     Dock as SystemDock, DockButton as SystemDockButton, DockSection as SystemDockSection,
 };
@@ -10,21 +12,21 @@ pub(super) fn Taskbar() -> impl IntoView {
     let runtime = use_desktop_runtime();
     let state = runtime.state;
 
-    let viewport_width = create_rw_signal(
+    let viewport_width = RwSignal::new(
         runtime
             .host
             .get_value()
             .desktop_viewport_rect(TASKBAR_HEIGHT_PX)
             .w,
     );
-    let clock_now = create_rw_signal(TaskbarClockSnapshot::now());
-    let selected_running_window = create_rw_signal(None::<WindowId>);
-    let window_context_menu = create_rw_signal(None::<TaskbarWindowContextMenuState>);
-    let overflow_menu_open = create_rw_signal(false);
-    let start_menu_was_open = create_rw_signal(false);
-    let overflow_menu_was_open = create_rw_signal(false);
-    let window_menu_was_open = create_rw_signal(false);
-    let taskbar_layout = create_memo(move |_| {
+    let clock_now = RwSignal::new(TaskbarClockSnapshot::now());
+    let selected_running_window = RwSignal::new(None::<WindowId>);
+    let window_context_menu = RwSignal::new(None::<TaskbarWindowContextMenuState>);
+    let overflow_menu_open = RwSignal::new(false);
+    let start_menu_was_open = RwSignal::new(false);
+    let overflow_menu_was_open = RwSignal::new(false);
+    let window_menu_was_open = RwSignal::new(false);
+    let taskbar_layout = Memo::new(move |_| {
         let desktop = state.get();
         compute_taskbar_layout(
             viewport_width.get(),
@@ -155,11 +157,11 @@ pub(super) fn Taskbar() -> impl IntoView {
         if ev.default_prevented() {
             return;
         }
-        if try_handle_taskbar_shortcuts(runtime, window_context_menu, overflow_menu_open, &ev) {}
+        if try_handle_taskbar_shortcuts(&runtime, window_context_menu, overflow_menu_open, &ev) {}
     });
     on_cleanup(move || global_shortcut_listener.remove());
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let desktop = state.get();
         let running = ordered_taskbar_windows(&desktop);
         let focused = running
@@ -186,7 +188,7 @@ pub(super) fn Taskbar() -> impl IntoView {
         });
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let is_open = state.get().panels.launcher_open;
         let was_open = start_menu_was_open.get_untracked();
         if is_open && !was_open {
@@ -197,7 +199,7 @@ pub(super) fn Taskbar() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let is_open = overflow_menu_open.get();
         let was_open = overflow_menu_was_open.get_untracked();
         if is_open && !was_open {
@@ -208,7 +210,7 @@ pub(super) fn Taskbar() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let is_open = window_context_menu.get().is_some();
         let was_open = window_menu_was_open.get_untracked();
         if is_open && !was_open {
@@ -220,7 +222,7 @@ pub(super) fn Taskbar() -> impl IntoView {
     });
 
     let on_taskbar_keydown = move |ev: web_sys::KeyboardEvent| {
-        if try_handle_taskbar_shortcuts(runtime, window_context_menu, overflow_menu_open, &ev) {
+        if try_handle_taskbar_shortcuts(&runtime, window_context_menu, overflow_menu_open, &ev) {
             return;
         }
 
@@ -379,7 +381,7 @@ pub(super) fn Taskbar() -> impl IntoView {
                                                 runtime.dispatch_action(DesktopAction::CloseStartMenu);
                                                 runtime.dispatch_action(DesktopAction::CloseControlCenter);
                                                 runtime.dispatch_action(DesktopAction::CloseNotificationCenter);
-                                                activate_pinned_taskbar_app(runtime, app_id_for_click.clone());
+                                                activate_pinned_taskbar_app(&runtime, app_id_for_click.clone());
                                             })
                                         >
                                             <span aria-hidden="true">
