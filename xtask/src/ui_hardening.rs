@@ -699,15 +699,11 @@ fn build_findings(
     let mut findings = Vec::new();
 
     if !config_audit.workflows.iter().all(|(_path, contents)| {
-        contents.contains("dtolnay/rust-toolchain@1.91.1")
-            || (contents.contains("uses: ./.github/actions/setup-build-environment")
-                && config_audit
-                    .setup_build_environment_action
-                    .contains("dtolnay/rust-toolchain@1.91.1"))
+        workflow_uses_pinned_rust_toolchain(contents, &config_audit.setup_build_environment_action)
     }) {
         findings.push(Finding::fail(
             "CI still uses a floating Rust toolchain",
-            "Expected all Rust-installing workflows to pin `dtolnay/rust-toolchain@1.91.1`.",
+            "Expected all Rust-installing workflows to pin the Rust toolchain directly or to use the repo-owned setup action that resolves the pinned channel from `rust-toolchain.toml`.",
             "floating toolchain selection can alter browser artifacts across environments",
         ));
     }
@@ -832,6 +828,18 @@ fn build_findings(
     }
 
     findings
+}
+
+fn workflow_uses_pinned_rust_toolchain(workflow_contents: &str, setup_action_contents: &str) -> bool {
+    workflow_contents.contains("dtolnay/rust-toolchain@1.91.1")
+        || (workflow_contents.contains("uses: ./.github/actions/setup-build-environment")
+            && setup_action_uses_pinned_rust_toolchain(setup_action_contents))
+}
+
+fn setup_action_uses_pinned_rust_toolchain(contents: &str) -> bool {
+    contents.contains("rustup toolchain install")
+        && contents.contains("rust-toolchain.toml")
+        && contents.contains("rustup component add")
 }
 
 fn build_actions(findings: &[Finding]) -> Vec<Action> {
