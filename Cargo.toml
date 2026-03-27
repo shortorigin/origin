@@ -134,7 +134,7 @@ toml = "0.8.23"
 tokio = { version = "1.50.0", features = ["macros", "rt-multi-thread", "time", "tracing"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "fmt", "json", "tracing"] }
-uuid = { version = "1.22.0", features = ["js", "serde", "v4"] }
+uuid = { version = "1.23.0", features = ["js", "serde", "v4"] }
 wasm-bindgen = "0.2.114"
 wasm-bindgen-futures = "0.4.64"
 wasmtime = { version = "42.0.1", default-features = false, features = ["cranelift", "runtime", "std"] }
